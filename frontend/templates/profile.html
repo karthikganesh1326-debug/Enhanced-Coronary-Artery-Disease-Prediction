@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}My Profile - CAD Prediction System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="dashboard-header">
+        <h1>My Profile</h1>
+        <p>Manage your account information and security settings</p>
+    </div>
+
+    <div class="table-container" style="max-width:800px;margin:0 auto;">
+        <form id="profileForm">
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <label>Username
+                    <input type="text" id="username" name="username" placeholder="Username" required />
+                </label>
+
+                <label>Email
+                    <input type="email" id="email" name="email" placeholder="you@example.com" />
+                </label>
+
+                <label>New Password
+                    <input type="password" id="password" name="password" placeholder="Leave empty to keep current" />
+                </label>
+
+                <label>Confirm Password
+                    <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm new password" />
+                </label>
+
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <button type="submit" class="btn">Save Changes</button>
+                    <span id="profileMsg" style="color:green;font-weight:600;display:none;margin-left:8px;"></span>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.dashboard-header {
+    background: linear-gradient(135deg, #0066cc, #003d99);
+    color: white;
+    padding: 30px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.table-container {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.08);
+}
+
+input[type="text"], input[type="email"], input[type="password"]{
+    width:100%; padding:10px; border-radius:6px; border:1px solid #ddd; margin-top:6px;
+}
+
+@media (max-width:768px){
+    .table-container{ padding:15px; }
+}
+</style>
+
+<script>
+// Load profile data and wire form submission
+document.addEventListener('DOMContentLoaded', ()=>{
+    const form = document.getElementById('profileForm');
+    const msg = document.getElementById('profileMsg');
+
+    function showMessage(text, success=true){
+        msg.style.display = 'inline-block';
+        msg.style.color = success ? 'green' : 'red';
+        msg.textContent = text;
+        setTimeout(()=> msg.style.display = 'none', 4000);
+    }
+
+    // Fetch current user profile (JSON endpoint)
+    fetch('/profile?json=1')
+        .then(r => {
+            if(!r.ok) throw new Error('Not authorized');
+            return r.json();
+        })
+        .then(data => {
+            const u = data.user || {};
+            document.getElementById('username').value = u.username || '';
+            document.getElementById('email').value = u.email || '';
+        })
+        .catch(err => {
+            console.error(err);
+            window.location.href = '/login';
+        });
+
+    form.addEventListener('submit', (e)=>{
+        e.preventDefault();
+        const payload = {
+            username: document.getElementById('username').value.trim(),
+            email: document.getElementById('email').value.trim(),
+            password: document.getElementById('password').value,
+            confirm_password: document.getElementById('confirm_password').value
+        };
+
+        fetch('/profile/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(r => r.json())
+        .then(res => {
+            if(res.success){
+                showMessage('Profile updated successfully', true);
+                // Clear password fields
+                document.getElementById('password').value = '';
+                document.getElementById('confirm_password').value = '';
+                // Optionally update any username UI by reloading
+                setTimeout(()=> location.reload(), 1000);
+            } else {
+                showMessage(res.message || 'Update failed', false);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            showMessage('Network error', false);
+        });
+    });
+});
+</script>
+
+{% endblock %}

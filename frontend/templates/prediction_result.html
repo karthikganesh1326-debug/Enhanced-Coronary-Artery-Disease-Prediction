@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}Prediction Result{% endblock %}
+
+{% block content %}
+<style>
+    .result-container {
+        background: white;
+        border-radius: 10px;
+        padding: 40px;
+        max-width: 600px;
+        margin: 0 auto;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .result-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .result-header h1 {
+        color: #0066cc;
+        font-size: 28px;
+        margin-bottom: 10px;
+    }
+
+    .risk-badge {
+        display: inline-block;
+        padding: 20px 30px;
+        font-size: 24px;
+        font-weight: 700;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        color: white;
+        text-align: center;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .risk-low {
+        background: #27ae60;
+    }
+
+    .risk-medium {
+        background: #f39c12;
+    }
+
+    .risk-high {
+        background: #e74c3c;
+    }
+
+    .probability-box {
+        background: #f8f9fa;
+        border-left: 4px solid #0066cc;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 5px;
+    }
+
+    .probability-box strong {
+        color: #0066cc;
+        font-size: 18px;
+    }
+
+    .progress-bar {
+        width: 100%;
+        height: 30px;
+        background: #e0e0e0;
+        border-radius: 15px;
+        overflow: hidden;
+        margin-top: 10px;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #27ae60 0%, #f39c12 50%, #e74c3c 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 12px;
+    }
+
+    .recommendation {
+        background: #e8f4f8;
+        border-left: 4px solid #0066cc;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 5px;
+    }
+
+    .recommendation h3 {
+        color: #0066cc;
+        margin-top: 0;
+    }
+
+    .button-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 30px;
+    }
+
+    .btn {
+        flex: 1;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 5px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        text-align: center;
+        transition: all 0.3s;
+    }
+
+    .btn-primary {
+        background: #0066cc;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #0052a3;
+    }
+
+    .btn-secondary {
+        background: #95a5a6;
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        background: #7f8c8d;
+    }
+
+    .alert-danger {
+        background-color: #fee;
+        border: 1px solid #fcc;
+        color: #c33;
+        padding: 12px 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+</style>
+
+<div class="result-container">
+    <div class="result-header">
+        <h1>Your Prediction Result</h1>
+    </div>
+
+    {% if error %}
+    <div class="alert-danger">{{ error }}</div>
+    {% else %}
+        <!-- Risk Category Badge -->
+        <div class="risk-badge {% if risk_category == 'LOW' %}risk-low{% elif risk_category == 'MEDIUM' %}risk-medium{% else %}risk-high{% endif %}">
+            {{ risk_category }} RISK
+        </div>
+
+        <!-- Probability -->
+        <div class="probability-box">
+            <strong>CAD Risk Probability: {{ probability }}%</strong>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ probability }}%">
+                    {{ probability }}%
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommendation -->
+        <div class="recommendation">
+            <h3>Medical Recommendation</h3>
+            <p>{{ recommendation }}</p>
+        </div>
+
+        <!-- Risk Category Explanation -->
+        <div class="probability-box">
+            <strong>Risk Assessment:</strong>
+            <ul style="margin: 10px 0; padding-left: 20px;">
+                {% if risk_category == 'LOW' %}
+                    <li>Low risk of coronary artery disease</li>
+                    <li>Continue preventive health care practices</li>
+                    <li>Maintain regular check-ups annually</li>
+                {% elif risk_category == 'MEDIUM' %}
+                    <li>Moderate risk - requires attention</li>
+                    <li>Consult with cardiology specialist</li>
+                    <li>Consider additional diagnostic testing</li>
+                {% else %}
+                    <li>High risk - immediate action needed</li>
+                    <li>Urgent cardiology consultation required</li>
+                    <li>Advanced cardiac imaging recommended</li>
+                {% endif %}
+            </ul>
+        </div>
+
+        <!-- Note -->
+        <div style="background: #fffbf0; border-left: 4px solid #f39c12; padding: 15px; margin: 20px 0; border-radius: 5px; font-size: 12px; color: #666;">
+            <strong>Important:</strong> This prediction is based on machine learning models and should not replace professional medical diagnosis. Always consult with healthcare professionals for medical decisions.
+        </div>
+    {% endif %}
+
+    <!-- Action Buttons -->
+    <div class="button-group">
+        <a href="/patient/predict" class="btn btn-primary">Another Prediction</a>
+        <a href="/patient/dashboard" class="btn btn-secondary">My Dashboard</a>
+    </div>
+</div>
+{% endblock %}

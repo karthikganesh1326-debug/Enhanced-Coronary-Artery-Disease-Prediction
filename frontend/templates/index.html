@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+
+{% block title %}CAD Risk Prediction | Home{% endblock %}
+
+{% block extra_styles %}
+    <style>
+        .hero {
+            background: linear-gradient(135deg, #0066cc 0%, #003d99 100%);
+            color: white;
+            padding: 3rem 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+            max-width: 600px;
+            margin: 1rem auto;
+        }
+
+        .info-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .card h3 {
+            color: #0066cc;
+            margin-bottom: 0.5rem;
+            font-size: 1.3rem;
+        }
+
+        .card p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 0;
+        }
+
+        .prediction-section {
+            background: white;
+            padding: 3rem 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .prediction-section h2 {
+            color: #0066cc;
+            margin-bottom: 1rem;
+            font-size: 1.8rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        label .help-text {
+            font-size: 0.8rem;
+            color: #999;
+            font-weight: normal;
+            margin-left: 0.5rem;
+        }
+
+        input[type="number"],
+        input[type="text"],
+        select {
+            padding: 0.75rem;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+            font-family: inherit;
+        }
+
+        input[type="number"]:focus,
+        input[type="text"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #0066cc;
+            box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+        }
+
+        .form-hint {
+            font-size: 0.85rem;
+            color: #999;
+            margin-top: 0.25rem;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        button {
+            padding: 0.75rem 2rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 150px;
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+            color: white;
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(39, 174, 96, 0.4);
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+
+        .btn-reset {
+            background: #ecf0f1;
+            color: #333;
+            border: 2px solid #bdc3c7;
+        }
+
+        .btn-reset:hover {
+            background: #dfe6e9;
+        }
+
+        .warning-banner {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            border-radius: 4px;
+            color: #856404;
+        }
+
+        .warning-banner strong {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 1.8rem;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .prediction-section {
+                padding: 1.5rem 1rem;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <!-- Hero Section -->
+    <div class="hero">
+        <h1>Coronary Artery Disease Risk Assessment</h1>
+        <p>Advanced Machine Learning System for Predicting CAD Risk</p>
+        <p style="font-size: 0.95rem; opacity: 0.8;">Using multiple algorithms: Logistic Regression, Random Forest, XGBoost, and SVM</p>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="info-cards">
+        <div class="card">
+            <div class="card-icon">📊</div>
+            <h3>Advanced ML Models</h3>
+            <p>Trained using multiple algorithms with hyperparameter tuning and cross-validation for maximum accuracy.</p>
+        </div>
+        <div class="card">
+            <div class="card-icon">🎯</div>
+            <h3>Risk Categories</h3>
+            <p>Get instant risk assessment (Low, Medium, High) with medical recommendations for each level.</p>
+        </div>
+        <div class="card">
+            <div class="card-icon">📈</div>
+            <h3>Feature Analysis</h3>
+            <p>See which patient health indicators are most important for your CAD risk prediction.</p>
+        </div>
+    </div>
+
+    <!-- Prediction Form -->
+    <div class="prediction-section" id="predict">
+        <h2>🩺 Patient Health Assessment</h2>
+        
+        <div class="warning-banner">
+            <strong>⚠️ Medical Disclaimer</strong>
+            This system is for informational purposes only. Always consult with qualified healthcare professionals for medical diagnosis and treatment.
+        </div>
+
+        <form method="POST" action="/predict">
+            <div class="form-grid">
+                <!-- Age -->
+                <div class="form-group">
+                    <label for="age">Age <span class="help-text">(years)</span></label>
+                    <input type="number" id="age" name="age" min="0" max="120" required placeholder="e.g., 55">
+                    <div class="form-hint">Patient's age in years (0-120)</div>
+                </div>
+
+                <!-- Sex -->
+                <div class="form-group">
+                    <label for="sex">Sex</label>
+                    <select id="sex" name="sex" required>
+                        <option value="">-- Select --</option>
+                        <option value="0">0 = Female</option>
+                        <option value="1">1 = Male</option>
+                    </select>
+                    <div class="form-hint">Patient's biological sex</div>
+                </div>
+
+                <!-- Anaemia -->
+                <div class="form-group">
+                    <label for="anaemia">Anaemia</label>
+                    <select id="anaemia" name="anaemia" required>
+                        <option value="">-- Select --</option>
+                        <option value="0">0 = No</option>
+                        <option value="1">1 = Yes</option>
+                    </select>
+                    <div class="form-hint">Presence of anaemia</div>
+                </div>
+
+                <!-- Creatinine Phosphokinase -->
+                <div class="form-group">
+                    <label for="creatinine_phosphokinase">CPK <span class="help-text">(mcg/L)</span></label>
+                    <input type="number" id="creatinine_phosphokinase" name="creatinine_phosphokinase" min="0" step="1" required placeholder="e.g., 500">
+                    <div class="form-hint">Creatinine phosphokinase level</div>
+                </div>
+
+                <!-- Diabetes -->
+                <div class="form-group">
+                    <label for="diabetes">Diabetes</label>
+                    <select id="diabetes" name="diabetes" required>
+                        <option value="">-- Select --</option>
+                        <option value="0">0 = No</option>
+                        <option value="1">1 = Yes</option>
+                    </select>
+                    <div class="form-hint">Diabetic status</div>
+                </div>
+
+                <!-- Ejection Fraction -->
+                <div class="form-group">
+                    <label for="ejection_fraction">Ejection Fraction <span class="help-text">(%)</span></label>
+                    <input type="number" id="ejection_fraction" name="ejection_fraction" min="0" max="100" step="0.1" required placeholder="e.g., 40">
+                    <div class="form-hint">Percentage of blood leaving the heart (0-100%)</div>
+                </div>
+
+                <!-- High Blood Pressure -->
+                <div class="form-group">
+                    <label for="high_blood_pressure">High Blood Pressure</label>
+                    <select id="high_blood_pressure" name="high_blood_pressure" required>
+                        <option value="">-- Select --</option>
+                        <option value="0">0 = No</option>
+                        <option value="1">1 = Yes</option>
+                    </select>
+                    <div class="form-hint">History of hypertension</div>
+                </div>
+
+                <!-- Platelets -->
+                <div class="form-group">
+                    <label for="platelets">Platelets <span class="help-text">(kiloplatelets/mL)</span></label>
+                    <input type="number" id="platelets" name="platelets" min="0" step="1000" required placeholder="e.g., 250000">
+                    <div class="form-hint">Platelet count in blood</div>
+                </div>
+
+                <!-- Serum Creatinine -->
+                <div class="form-group">
+                    <label for="serum_creatinine">Serum Creatinine <span class="help-text">(mg/dL)</span></label>
+                    <input type="number" id="serum_creatinine" name="serum_creatinine" min="0" step="0.1" required placeholder="e.g., 1.2">
+                    <div class="form-hint">Serum creatinine level (kidney function)</div>
+                </div>
+
+                <!-- Serum Sodium -->
+                <div class="form-group">
+                    <label for="serum_sodium">Serum Sodium <span class="help-text">(mEq/L)</span></label>
+                    <input type="number" id="serum_sodium" name="serum_sodium" min="100" max="160" step="1" required placeholder="e.g., 137">
+                    <div class="form-hint">Serum sodium level in blood</div>
+                </div>
+
+                <!-- Smoking -->
+                <div class="form-group">
+                    <label for="smoking">Smoking</label>
+                    <select id="smoking" name="smoking" required>
+                        <option value="">-- Select --</option>
+                        <option value="0">0 = Never</option>
+                        <option value="1">1 = Current/Former</option>
+                    </select>
+                    <div class="form-hint">Smoking status</div>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="button-group">
+                <button type="submit" class="btn-submit">🔍 Get Risk Assessment</button>
+                <button type="reset" class="btn-reset">Clear Form</button>
+            </div>
+        </form>
+
+        <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #ddd; text-align: center; color: #666;">
+            <p><strong>How it works:</strong> Fill in the patient's health parameters and click "Get Risk Assessment" to receive an instant CAD risk prediction.</p>
+        </div>
+    </div>
+{% endblock %}

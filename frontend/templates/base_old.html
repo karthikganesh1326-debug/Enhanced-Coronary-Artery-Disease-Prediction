@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CAD Prediction System{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+
+        /* Navigation */
+        nav {
+            background: linear-gradient(135deg, #0066cc 0%, #003d99 100%);
+            padding: 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .navbar-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .navbar-brand:hover {
+            opacity: 0.9;
+        }
+
+        .navbar-menu {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+            align-items: center;
+        }
+
+        .navbar-menu a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.3s;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+        }
+
+        .navbar-menu a:hover {
+            background: rgba(255, 255, 255, 0.2);
+            opacity: 1;
+        }
+
+        .navbar-menu a.active {
+            background: rgba(255, 255, 255, 0.3);
+            border-bottom: 2px solid white;
+        }
+
+        .auth-links {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-left: auto;
+        }
+
+        .auth-links a, .logout-btn {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: all 0.3s;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1rem;
+        }
+
+        .auth-links a:hover, .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .login-link {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .register-link {
+            background: rgba(39, 174, 96, 0.8);
+        }
+
+        .register-link:hover {
+            background: #27ae60;
+        }
+
+        .logout-btn {
+            background: rgba(231, 76, 60, 0.8);
+        }
+
+        .logout-btn:hover {
+            background: #e74c3c;
+        }
+
+        .user-info {
+            color: white;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Footer */
+        footer {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 2rem;
+            margin-top: 3rem;
+        }
+
+        footer p {
+            margin: 0.5rem 0;
+            font-size: 0.9rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .navbar-menu {
+                flex-direction: column;
+                gap: 0;
+            }
+
+            .auth-links {
+                flex-direction: column;
+                width: 100%;
+                gap: 0;
+                margin-left: 0;
+            }
+
+            .auth-links a, .logout-btn {
+                width: 100%;
+                text-align: left;
+                padding: 0.75rem;
+                border-radius: 0;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            .navbar-menu a {
+                padding: 0.75rem;
+                border-radius: 0;
+            }
+
+            .user-info {
+                width: 100%;
+                padding: 0.75rem;
+            }
+        }
+
+        {% block extra_styles %}{% endblock %}
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav>
+        <div class="navbar-container">
+            <a href="/" class="navbar-brand">
+                ❤️ CAD Prediction System
+            </a>
+            <ul class="navbar-menu">
+                {% if session.get('user_id') %}
+                    <li><a href="/" {% if request.path == '/' %}class="active"{% endif %}>Home</a></li>
+                    <li><a href="/#predict" {% if request.path == '/' %}class="active"{% endif %}>Predict</a></li>
+                {% endif %}
+                <li><a href="/about" {% if request.path == '/about' %}class="active"{% endif %}>About</a></li>
+                
+                <div class="auth-links">
+                    {% if session.get('user_id') %}
+                        <div class="user-info">
+                            👤 {{ session.get('username', 'User') }}
+                        </div>
+                        <form method="GET" action="/logout" style="display: inline;">
+                            <button type="submit" class="logout-btn">Logout</button>
+                        </form>
+                    {% else %}
+                        <a href="{{ url_for('login') }}" class="login-link">Login</a>
+                        <a href="{{ url_for('register') }}" class="register-link">Register</a>
+                    {% endif %}
+                </div>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <p><strong>Coronary Artery Disease Prediction System</strong></p>
+        <p>Professional ML-based healthcare prediction tool. For informational purposes only. Always consult with medical professionals.</p>
+        <p>&copy; 2026 CAD Prediction System. All rights reserved.</p>
+    </footer>
+</body>
+</html>

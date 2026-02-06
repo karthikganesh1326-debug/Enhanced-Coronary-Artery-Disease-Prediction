@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+
+{% block title %}Doctor Dashboard - Patient Management{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="dashboard-header">
+        <h1>Patient Management Dashboard</h1>
+        <p>Monitor and review your patients' cardiac risk assessments</p>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">{{ total_patients }}</div>
+            <div class="stat-label">Total Patients</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ total_predictions }}</div>
+            <div class="stat-label">Total Assessments</div>
+        </div>
+    </div>
+
+    <!-- Patients Table -->
+    <div class="table-container">
+        <h2>Your Patients</h2>
+        
+        {% if patients %}
+            <div class="table-wrapper">
+                <table class="patients-table">
+                    <thead>
+                        <tr>
+                            <th>Patient Name</th>
+                            <th>Email</th>
+                            <th>Registered</th>
+                            <th>Assessments</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for patient in patients %}
+                        <tr>
+                            <td class="patient-name">
+                                👤 {{ patient.username }}
+                            </td>
+                            <td>{{ patient.email }}</td>
+                            <td class="date-cell">{{ patient.created_at | replace('T', ' ') | truncate(19, True, '') }}</td>
+                            <td class="center">
+                                <span class="badge">{{ patient.prediction_count }}</span>
+                            </td>
+                            <td class="center">
+                                <a href="/doctor/patient/{{ patient.id }}" class="btn-view">View Details </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <p>No patients registered yet.</p>
+                <p>Patients will appear here once they create accounts and take assessments.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- All Assessments -->
+    <div class="table-container" style="margin-top:30px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h2 style="margin:0;">All Patient Assessments</h2>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <input id="filterUsername" placeholder="Patient name" style="padding:6px 8px;border-radius:6px;border:1px solid #ddd;" />
+                    <select id="filterRisk" style="padding:6px 8px;border-radius:6px;border:1px solid #ddd;">
+                        <option value="">All risks</option>
+                        <option value="LOW">LOW</option>
+                        <option value="MEDIUM">MEDIUM</option>
+                        <option value="HIGH">HIGH</option>
+                    </select>
+                    <input id="filterStart" type="date" style="padding:6px 8px;border-radius:6px;border:1px solid #ddd;" />
+                    <input id="filterEnd" type="date" style="padding:6px 8px;border-radius:6px;border:1px solid #ddd;" />
+                    <button id="applyFilters" class="btn">Filter</button>
+                    <button id="clearFilters" class="btn btn-secondary">Clear</button>
+                </div>
+                <a id="exportCsvLink" href="/doctor/predictions.csv" class="btn btn-secondary" title="Export all assessments as CSV">Export CSV</a>
+                <div id="paginationControls" style="display:flex;gap:8px;align-items:center;"></div>
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table id="assessmentsTable" class="patients-table">
+                <thead>
+                    <tr>
+                        <th>Patient Name</th>
+                        <th>Date</th>
+                        <th>Prediction</th>
+                        <th>Probability</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Populated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal for assessment details -->
+    <div id="assessmentModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span id="modalClose" class="modal-close">&times;</span>
+            <h3 id="modalPatient">Assessment Details</h3>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.dashboard-header {
+    background: linear-gradient(135deg, #0066cc, #003d99);
+    color: white;
+    padding: 40px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.dashboard-header h1 {
+    font-size: 2.5rem;
+    margin: 0 0 10px 0;
+}
+
+.dashboard-header p {
+    font-size: 1.1rem;
+    margin: 0;
+    opacity: 0.9;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    text-align: center;
+    border-top: 4px solid #0066cc;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #0066cc;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    color: #666;
+    font-size: 0.95rem;
+}
+
+.table-container {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.table-container h2 {
+    color: #0066cc;
+    margin: 0 0 20px 0;
+    font-size: 1.5rem;
+    border-bottom: 2px solid #e8f4f8;
+    padding-bottom: 15px;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.patients-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.patients-table thead {
+    background: #f5f5f5;
+}
+
+.patients-table th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #ddd;
+}
+
+.patients-table td {
+    padding: 15px 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.patients-table tbody tr {
+    transition: all 0.2s ease;
+}
+
+.patients-table tbody tr:hover {
+    background: #f9f9f9;
+    box-shadow: inset 0 0 0 1px #e8f4f8;
+}
+
+.patient-name {
+    font-weight: 600;
+    color: #0066cc;
+}
+
+.date-cell {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.center {
+    text-align: center;
+}
+
+.badge {
+    background: #e8f4f8;
+    color: #0066cc;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.btn-view {
+    background: #0066cc;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    display: inline-block;
+}
+
+.btn-view:hover {
+    background: #004699;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 102, 204, 0.3);
+}
+
+/* Risk badge colors */
+.risk-badge {
+    padding: 6px 10px;
+    border-radius: 14px;
+    font-weight: 700;
+    color: white;
+    display: inline-block;
+}
+.risk-badge.low-risk { background: #27ae60; }
+.risk-badge.medium-risk { background: #f1c40f; color: #222; }
+.risk-badge.high-risk { background: #e74c3c; }
+
+/* Modal styles */
+.modal { position: fixed; z-index: 2000; left:0; top:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.5); }
+.modal-content { background:white; width: 95%; max-width:700px; border-radius:8px; padding:20px; box-shadow:0 10px 30px rgba(0,0,0,0.2); }
+.modal-close { position:absolute; right:18px; top:12px; font-size:28px; cursor:pointer; color:#666; }
+.modal h3{ margin-top:0; }
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+    background: #f9f9f9;
+    border-radius: 4px;
+}
+
+.empty-state p {
+    margin: 10px 0;
+    font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .table-wrapper {
+        font-size: 0.9rem;
+    }
+
+    .patients-table th,
+    .patients-table td {
+        padding: 10px 8px;
+    }
+
+    .btn-view {
+        padding: 4px 8px;
+        font-size: 0.8rem;
+    }
+}
+</style>
+<script>
+// Fetch all assessments for doctor and populate the table
+document.addEventListener('DOMContentLoaded', function(){
+    const tableBody = document.querySelector('#assessmentsTable tbody');
+    const modal = document.getElementById('assessmentModal');
+    const modalBody = document.getElementById('modalBody');
+    const modalClose = document.getElementById('modalClose');
+
+    function riskColorClass(risk){
+        if(!risk) return '';
+        if(risk === 'LOW') return 'low-risk';
+        if(risk === 'MEDIUM') return 'medium-risk';
+        return 'high-risk';
+    }
+
+    // Server-side pagination variables
+    const perPage = 10;
+    let currentPage = 1;
+    let pagePreds = [];
+    let total = 0;
+    let totalPages = 1;
+
+    function renderPage(){
+        tableBody.innerHTML = '';
+        const pageItems = pagePreds || [];
+        if(pageItems.length === 0){
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td colspan="4">No assessments found.</td>';
+            tableBody.appendChild(tr);
+            return;
+        }
+
+        pageItems.forEach(p => {
+            const tr = document.createElement('tr');
+            tr.className = 'assessment-row';
+            tr.dataset.id = p.id;
+            tr.innerHTML = `
+                <td class="patient-name">👤 ${p.username}</td>
+                <td class="date-cell">${(p.created_at || '').replace('T',' ').slice(0,19)}</td>
+                <td><span class="risk-badge ${riskColorClass(p.risk_category)}">${p.risk_category || ''}</span></td>
+                <td>${(p.probability*100).toFixed(1)}%</td>
+            `;
+
+            tr.addEventListener('click', () => showModalFor(p));
+            tableBody.appendChild(tr);
+        });
+
+        renderPaginationControls();
+    }
+
+    function renderPaginationControls(){
+        const controls = document.getElementById('paginationControls');
+        controls.innerHTML = '';
+        totalPages = Math.max(1, Math.ceil(total / perPage));
+
+        const prev = document.createElement('button');
+        prev.className = 'btn'; prev.textContent = 'Prev';
+        prev.disabled = currentPage === 1;
+        prev.addEventListener('click', ()=>{ if(currentPage>1){ currentPage--; fetchPage(currentPage); } });
+        controls.appendChild(prev);
+
+        const label = document.createElement('span');
+        label.style.color = '#333'; label.textContent = `Page ${currentPage} / ${totalPages}`;
+        controls.appendChild(label);
+
+        const next = document.createElement('button');
+        next.className = 'btn'; next.textContent = 'Next';
+        next.disabled = currentPage === totalPages;
+        next.addEventListener('click', ()=>{ if(currentPage<totalPages){ currentPage++; fetchPage(currentPage); } });
+        controls.appendChild(next);
+    }
+
+    function showModalFor(p){
+        modal.style.display = 'block';
+        document.getElementById('modalPatient').textContent = `Details — ${p.username} — ${ (p.created_at||'') }`;
+        const feat = p.features || {};
+        let html = '<table style="width:100%;border-collapse:collapse;">';
+        for(const k in feat){
+            html += `<tr><td style="padding:6px 8px;border-bottom:1px solid #eee;font-weight:600">${k}</td><td style="padding:6px 8px;border-bottom:1px solid #eee">${feat[k]}</td></tr>`;
+        }
+        html += `<tr><td style="padding:6px 8px;font-weight:600">Probability</td><td style="padding:6px 8px">${(p.probability*100).toFixed(1)}%</td></tr>`;
+        html += `<tr><td style="padding:6px 8px;font-weight:600">Risk</td><td style="padding:6px 8px">${p.risk_category}</td></tr>`;
+        html += '</table>';
+        modalBody.innerHTML = html;
+    }
+
+    // Filter state
+    let filterUsername = '';
+    let filterRisk = '';
+    let filterStart = '';
+    let filterEnd = '';
+
+    // Build query string with filters
+    function buildQuery(page){
+        const qs = new URLSearchParams();
+        qs.append('page', page);
+        qs.append('per_page', perPage);
+        if(filterUsername) qs.append('username', filterUsername);
+        if(filterRisk) qs.append('risk', filterRisk);
+        if(filterStart) qs.append('start_date', filterStart);
+        if(filterEnd) qs.append('end_date', filterEnd);
+        return qs.toString();
+    }
+
+    // Fetch a specific page from server and render
+    function fetchPage(page){
+        const query = buildQuery(page);
+        // update export link to include current filters
+        const exportLink = document.getElementById('exportCsvLink');
+        exportLink.href = '/doctor/predictions.csv' + (query ? ('?' + query) : '');
+
+        fetch(`/doctor/predictions?${query}`)
+            .then(res => {
+                if (!res.ok) throw new Error('Not authorized or network error');
+                return res.json();
+            })
+            .then(data => {
+                pagePreds = data.predictions || [];
+                total = data.total || 0;
+                currentPage = data.page || page;
+                renderPage();
+            })
+            .catch(err => {
+                console.error(err);
+                window.location.href = '/login';
+            });
+    }
+
+    // Hook filter controls
+    document.getElementById('applyFilters').addEventListener('click', ()=>{
+        filterUsername = document.getElementById('filterUsername').value.trim();
+        filterRisk = document.getElementById('filterRisk').value;
+        const s = document.getElementById('filterStart').value;
+        const e = document.getElementById('filterEnd').value;
+        filterStart = s ? (s + ' 00:00:00') : '';
+        filterEnd = e ? (e + ' 23:59:59') : '';
+        fetchPage(1);
+    });
+
+    document.getElementById('clearFilters').addEventListener('click', ()=>{
+        document.getElementById('filterUsername').value = '';
+        document.getElementById('filterRisk').value = '';
+        document.getElementById('filterStart').value = '';
+        document.getElementById('filterEnd').value = '';
+        filterUsername = filterRisk = filterStart = filterEnd = '';
+        fetchPage(1);
+    });
+
+    // Initialize first page
+    fetchPage(1);
+
+    modalClose.addEventListener('click', ()=> modal.style.display = 'none');
+    window.addEventListener('click', (e)=>{ if(e.target == modal) modal.style.display = 'none'; });
+});
+</script>
+{% endblock %}

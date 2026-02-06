@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block title %}About | CAD Prediction System{% endblock %}
+
+{% block extra_styles %}
+    <style>
+        .about-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .about-section {
+            background: white;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .about-section h2 {
+            color: #0066cc;
+            border-bottom: 3px solid #0066cc;
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .about-section h3 {
+            color: #333;
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .about-section p {
+            color: #666;
+            line-height: 1.8;
+            margin-bottom: 1rem;
+        }
+
+        .about-section ul {
+            color: #666;
+            line-height: 1.8;
+            margin-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .about-section li {
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .feature-card {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #0066cc;
+        }
+
+        .feature-card h3 {
+            color: #0066cc;
+            margin-top: 0;
+        }
+
+        .feature-card p {
+            margin-bottom: 0;
+        }
+
+        .algorithms {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .algorithm-item {
+            background: #ecf5ff;
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid #0066cc;
+            text-align: center;
+        }
+
+        .algorithm-item strong {
+            color: #0066cc;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .algorithm-item small {
+            color: #666;
+        }
+
+        .disclaimer-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 1.5rem;
+            border-radius: 6px;
+            margin: 2rem 0;
+            color: #856404;
+        }
+
+        .disclaimer-box strong {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        code {
+            background: #f4f4f4;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #e74c3c;
+        }
+
+        @media (max-width: 768px) {
+            .about-section {
+                padding: 1.5rem 1rem;
+            }
+
+            .algorithms {
+                grid-template-columns: 1fr;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="about-container">
+        <!-- Hero -->
+        <div style="text-align: center; margin-bottom: 3rem;">
+            <h1 style="color: #0066cc; font-size: 2.5rem;">About CAD Prediction System</h1>
+            <p style="color: #666; font-size: 1.1rem;">A professional machine learning system for predicting Coronary Artery Disease risk</p>
+        </div>
+
+        <!-- Overview -->
+        <div class="about-section">
+            <h2>📋 System Overview</h2>
+            <p>
+                The CAD (Coronary Artery Disease) Prediction System is an advanced machine learning application designed to 
+                assess the risk of coronary artery disease in patients based on their health parameters and medical history. 
+                Using multiple state-of-the-art algorithms and comprehensive data preprocessing, this system provides accurate 
+                risk stratification to support clinical decision-making.
+            </p>
+            <p>
+                <strong>⚠️ Important Disclaimer:</strong> This system is for informational and educational purposes only. 
+                It should NOT replace professional medical diagnosis or treatment. Always consult with qualified healthcare 
+                professionals before making medical decisions.
+            </p>
+        </div>
+
+        <!-- Machine Learning Approach -->
+        <div class="about-section">
+            <h2>🤖 Machine Learning Methodology</h2>
+            
+            <h3>Multiple Algorithm Approaches</h3>
+            <p>Our system employs four complementary machine learning algorithms to maximize prediction accuracy:</p>
+            
+            <div class="algorithms">
+                <div class="algorithm-item">
+                    <strong>Logistic Regression</strong>
+                    <small>Probabilistic linear classifier for binary classification</small>
+                </div>
+                <div class="algorithm-item">
+                    <strong>Random Forest</strong>
+                    <small>Ensemble of decision trees for robust predictions</small>
+                </div>
+                <div class="algorithm-item">
+                    <strong>XGBoost</strong>
+                    <small>Gradient boosting framework for high accuracy</small>
+                </div>
+                <div class="algorithm-item">
+                    <strong>Support Vector Machine</strong>
+                    <small>Kernel-based classifier for non-linear patterns</small>
+                </div>
+            </div>
+
+            <h3>Data Preprocessing</h3>
+            <ul>
+                <li><strong>Feature Scaling:</strong> StandardScaler normalization for consistent model performance</li>
+                <li><strong>Train-Test Split:</strong> 80-20 split for reliable performance evaluation</li>
+                <li><strong>Stratified Sampling:</strong> Maintains class distribution in train/test sets</li>
+                <li><strong>Cross-Validation:</strong> 5-fold stratified k-fold validation to prevent overfitting</li>
+            </ul>
+
+            <h3>Hyperparameter Tuning</h3>
+            <p>
+                Each algorithm undergoes GridSearchCV optimization with comprehensive parameter grids to identify 
+                the best hyperparameter combinations. The final model is selected based on F1-score, which balances 
+                precision and recall for medical predictions.
+            </p>
+
+            <h3>Performance Metrics</h3>
+            <p>All models are evaluated using multiple metrics:</p>
+            <ul>
+                <li><strong>Accuracy:</strong> Overall correctness of predictions</li>
+                <li><strong>Precision:</strong> True positive rate among positive predictions</li>
+                <li><strong>Recall:</strong> True positive rate among actual positives</li>
+                <li><strong>F1-Score:</strong> Harmonic mean of precision and recall</li>
+                <li><strong>ROC-AUC:</strong> Area under the receiver operating characteristic curve</li>
+            </ul>
+        </div>
+
+        <!-- Input Features -->
+        <div class="about-section">
+            <h2>📊 Patient Health Parameters</h2>
+            <p>The system analyzes 11 key health indicators to make risk predictions:</p>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>Age</h3>
+                    <p>Patient's age in years. Age is a significant risk factor for CAD.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Sex</h3>
+                    <p>Biological sex (0=Female, 1=Male). Gender differences affect CAD risk profiles.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Anaemia</h3>
+                    <p>Presence of anaemia (0=No, 1=Yes). Anaemia affects cardiac workload.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Creatinine Phosphokinase (CPK)</h3>
+                    <p>Enzyme level (mcg/L). Elevated CPK indicates muscle or cardiac damage.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Diabetes</h3>
+                    <p>Diabetic status (0=No, 1=Yes). Diabetes significantly increases CAD risk.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Ejection Fraction</h3>
+                    <p>Percentage (0-100%). Measures percentage of blood pumped by the heart per beat.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>High Blood Pressure</h3>
+                    <p>Hypertension status (0=No, 1=Yes). Major risk factor for cardiovascular disease.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Platelets</h3>
+                    <p>Count (kiloplatelets/mL). Platelets play a role in blood clotting and CAD.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Serum Creatinine</h3>
+                    <p>Level (mg/dL). Indicates kidney function, which affects cardiac health.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Serum Sodium</h3>
+                    <p>Level (mEq/L). Electrolyte balance affects heart function.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Smoking</h3>
+                    <p>Smoking status (0=Never, 1=Current/Former). Major risk factor for CAD.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Risk Categories -->
+        <div class="about-section">
+            <h2>⚠️ Risk Categories</h2>
+            <p>Predictions are categorized into three risk levels based on probability:</p>
+            
+            <div style="margin: 1.5rem 0;">
+                <div style="background: #d4edda; border-left: 4px solid #28a745; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                    <strong style="color: #155724;">🟢 LOW RISK (0-33%)</strong>
+                    <p style="color: #155724; margin: 0.5rem 0 0 0;">
+                        Patient has low probability of CAD. Continue regular health check-ups and maintain healthy lifestyle.
+                    </p>
+                </div>
+                
+                <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                    <strong style="color: #856404;">🟡 MEDIUM RISK (33-67%)</strong>
+                    <p style="color: #856404; margin: 0.5rem 0 0 0;">
+                        Patient has moderate CAD risk. Schedule appointment with cardiologist for evaluation and risk management.
+                    </p>
+                </div>
+                
+                <div style="background: #f8d7da; border-left: 4px solid #dc3545; padding: 1rem; border-radius: 6px;">
+                    <strong style="color: #721c24;">🔴 HIGH RISK (67-100%)</strong>
+                    <p style="color: #721c24; margin: 0.5rem 0 0 0;">
+                        Patient has high CAD probability. URGENT: Consult cardiologist immediately and consider additional testing.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features -->
+        <div class="about-section">
+            <h2>✨ System Features</h2>
+            <ul>
+                <li><strong>Multiple Algorithms:</strong> Combines 4 different ML approaches for robust predictions</li>
+                <li><strong>Hyperparameter Optimization:</strong> GridSearchCV for best model configuration</li>
+                <li><strong>Cross-Validation:</strong> 5-fold stratified K-fold validation</li>
+                <li><strong>Risk Stratification:</strong> Three-tier risk categorization (Low/Medium/High)</li>
+                <li><strong>Medical Recommendations:</strong> Context-aware suggestions based on risk level</li>
+                <li><strong>Feature Importance:</strong> Shows which health factors most influence the prediction</li>
+                <li><strong>Prediction Logging:</strong> Saves all predictions for audit trail and analysis</li>
+                <li><strong>Professional UI:</strong> Healthcare-colored responsive design</li>
+                <li><strong>REST API:</strong> JSON endpoints for integration with other systems</li>
+                <li><strong>Scalable Backend:</strong> Flask-based architecture supporting multiple concurrent users</li>
+            </ul>
+        </div>
+
+        <!-- Technology Stack -->
+        <div class="about-section">
+            <h2>⚙️ Technology Stack</h2>
+            
+            <h3>Machine Learning & Data Processing</h3>
+            <ul>
+                <li><code>scikit-learn</code> - Core ML algorithms and preprocessing</li>
+                <li><code>XGBoost</code> - Gradient boosting implementation</li>
+                <li><code>pandas</code> - Data manipulation and analysis</li>
+                <li><code>NumPy</code> - Numerical computing</li>
+            </ul>
+            
+            <h3>Backend Framework</h3>
+            <ul>
+                <li><code>Flask</code> - Python web framework</li>
+                <li><code>Python 3.8+</code> - Programming language</li>
+            </ul>
+            
+            <h3>Frontend Technologies</h3>
+            <ul>
+                <li><code>HTML5</code> - Markup structure</li>
+                <li><code>CSS3</code> - Responsive styling</li>
+                <li><code>Jinja2</code> - Template rendering</li>
+            </ul>
+        </div>
+
+        <!-- Disclaimer -->
+        <div class="disclaimer-box">
+            <strong>⚠️ Medical Disclaimer & Important Notice</strong>
+            <p>
+                This Coronary Artery Disease Prediction System is a machine learning model created for educational and 
+                informational purposes only. The predictions generated by this system should NOT be used as a substitute for 
+                professional medical diagnosis, treatment, or medical advice.
+            </p>
+            <p>
+                Always consult with qualified healthcare professionals, such as cardiologists or other medical specialists, 
+                before making any health-related decisions based on the predictions from this system. The system may not account 
+                for all factors that influence CAD risk in individual patients.
+            </p>
+            <p>
+                By using this system, you acknowledge that you understand these limitations and agree to consult with medical 
+                professionals for proper diagnosis and treatment.
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; margin-top: 3rem; padding: 2rem; background: #f8f9fa; border-radius: 10px;">
+            <p style="color: #666; margin: 0;">
+                <strong>CAD Prediction System</strong> | A Professional ML-Based Healthcare Tool | v1.0
+            </p>
+            <p style="color: #999; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                For more information, visit <a href="/" style="color: #0066cc; text-decoration: none;"><strong>Home</strong></a> to make a prediction.
+            </p>
+        </div>
+    </div>
+{% endblock %}

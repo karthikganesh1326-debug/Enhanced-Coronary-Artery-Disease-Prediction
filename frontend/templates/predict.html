@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Make Prediction - CAD Risk Assessment{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="dashboard-header">
+        <h1>CAD Risk Assessment</h1>
+        <p>Enter your medical data for personalized cardiac risk evaluation</p>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-error">
+        <p>{{ error }}</p>
+    </div>
+    {% endif %}
+
+    <form method="POST" class="prediction-form">
+        <div class="form-section">
+            <h2>Patient Information</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="age">Age (years)</label>
+                    <input type="number" id="age" name="age" min="0" max="120" step="1" required>
+                    <small>Patient age in years</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="sex">Sex</label>
+                    <select id="sex" name="sex" required>
+                        <option value="">-- Select --</option>
+                        <option value="0">Female</option>
+                        <option value="1">Male</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>Cardiac Measurements</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="ejection_fraction">Ejection Fraction (%)</label>
+                    <input type="number" id="ejection_fraction" name="ejection_fraction" min="0" max="100" step="0.1" required>
+                    <small>Percentage of blood leaving the heart (0-100%)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="serum_creatinine">Serum Creatinine (mg/dL)</label>
+                    <input type="number" id="serum_creatinine" name="serum_creatinine" min="0" max="10" step="0.1" required>
+                    <small>Kidney function marker</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="creatinine_phosphokinase">CPK (mcg/L)</label>
+                    <input type="number" id="creatinine_phosphokinase" name="creatinine_phosphokinase" min="0" step="1" required>
+                    <small>Creatinine phosphokinase enzyme level</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="platelets">Platelets (kiloplatelets/mL)</label>
+                    <input type="number" id="platelets" name="platelets" min="0" max="1000" step="1" required>
+                    <small>Blood clotting cells count</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>Medical History</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="diabetes">Diabetes</label>
+                    <select id="diabetes" name="diabetes" required>
+                        <option value="">-- Select --</option>
+                        <option value="0">No</option>
+                        <option value="1">Yes</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="high_blood_pressure">High Blood Pressure</label>
+                    <select id="high_blood_pressure" name="high_blood_pressure" required>
+                        <option value="">-- Select --</option>
+                        <option value="0">No</option>
+                        <option value="1">Yes</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="anaemia">Anemia</label>
+                    <select id="anaemia" name="anaemia" required>
+                        <option value="">-- Select --</option>
+                        <option value="0">No</option>
+                        <option value="1">Yes</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="smoking">Smoking</label>
+                    <select id="smoking" name="smoking" required>
+                        <option value="">-- Select --</option>
+                        <option value="0">No</option>
+                        <option value="1">Yes</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>Follow-up Data</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="serum_sodium">Serum Sodium (mEq/L)</label>
+                    <input type="number" id="serum_sodium" name="serum_sodium" min="120" max="160" step="0.1" required>
+                    <small>Blood sodium level (typically 135-145)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="time">Follow-up Time (days)</label>
+                    <input type="number" id="time" name="time" min="0" step="1" required>
+                    <small>Days since initial diagnosis</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Analyze Risk</button>
+            <a href="/patient/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+        </div>
+    </form>
+</div>
+
+<style>
+.prediction-form {
+    background: white;
+    border-radius: 8px;
+    padding: 30px;
+    max-width: 900px;
+    margin: 0 auto;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.form-section {
+    margin-bottom: 30px;
+}
+
+.form-section h2 {
+    color: #0066cc;
+    font-size: 1.3rem;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e8f4f8;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.form-group input,
+.form-group select {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #0066cc;
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.form-group small {
+    color: #666;
+    font-size: 0.85rem;
+    margin-top: 4px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 15px;
+   margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+.form-actions .btn {
+    padding: 12px 24px;
+    font-size: 1rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.form-actions .btn-primary {
+    background: linear-gradient(135deg, #0066cc, #004699);
+    color: white;
+}
+
+.form-actions .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 102, 204, 0.3);
+}
+
+.form-actions .btn-secondary {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.form-actions .btn-secondary:hover {
+    background: #e0e0e0;
+}
+
+.alert {
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.alert-error {
+    background: #fee;
+    color: #c33;
+    border: 1px solid #fcc;
+}
+</style>
+{% endblock %}

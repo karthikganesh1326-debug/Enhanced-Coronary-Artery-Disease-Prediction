@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Register - CAD Prediction System{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>Create Account</h1>
+            <p>Join as a Patient or Healthcare Professional</p>
+        </div>
+
+        <div class="role-selector">
+            <a href="/register_patient" class="role-option">
+                <h3>👤 Patient</h3>
+                <p>Get your CAD risk prediction and track your health</p>
+            </a>
+
+            <a href="/register_doctor" class="role-option">
+                <h3>👨‍⚕️ Doctor</h3>
+                <p>Monitor patient health and view predictions</p>
+            </a>
+        </div>
+
+        <div class="auth-footer">
+            <p>Already have an account? <a href="/login">Sign in here</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

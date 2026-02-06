@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}Patient Details - {{ patient_name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="patient-header">
+        <a href="/doctor/dashboard" class="back-link">← Back to Patients</a>
+        <h1>👤 {{ patient_name }}</h1>
+    </div>
+
+    <!-- Patient Info Cards -->
+    <div class="info-cards">
+        <div class="info-card">
+            <span class="info-label">Email</span>
+            <span class="info-value">{{ patient_email }}</span>
+        </div>
+        <div class="info-card">
+            <span class="info-label">Registered</span>
+            <span class="info-value">{{ patient_created_at | replace('T', ' ') | truncate(10, True, '') }}</span>
+        </div>
+        <div class="info-card">
+            <span class="info-label">Total Assessments</span>
+            <span class="info-value">{{ total_predictions }}</span>
+        </div>
+    </div>
+
+    <!-- Assessments Timeline -->
+    <div class="timeline-container">
+        <h2>Assessment History</h2>
+        
+        {% if predictions %}
+            <div class="timeline">
+                {% for prediction in predictions | reverse %}
+                <div class="timeline-item">
+                    <div class="timeline-bullet"></div>
+                    <div class="timeline-card">
+                        <div class="timeline-header">
+                            <span class="timeline-date">📅 {{ prediction.created_at | replace('T', ' ') | truncate(16, True, '') }}</span>
+                            <span class="risk-badge {% if prediction.risk_category == 'LOW' %}low-risk{% elif prediction.risk_category == 'MEDIUM' %}medium-risk{% else %}high-risk{% endif %}">
+                                {{ prediction.risk_category }}
+                            </span>
+                        </div>
+                        <div class="timeline-details">
+                            <div class="detail-grid">
+                                <div class="detail">
+                                    <span class="label">Risk Probability:</span>
+                                    <span class="value">{{ "%.1f" | format(prediction.probability * 100) }}%</span>
+                                </div>
+                                <div class="detail">
+                                    <span class="label">Age:</span>
+                                    <span class="value">{{ prediction.age }} years</span>
+                                </div>
+                                <div class="detail">
+                                    <span class="label">Ejection Fraction:</span>
+                                    <span class="value">{{ "%.1f" | format(prediction.ejection_fraction) }}%</span>
+                                </div>
+                                <div class="detail">
+                                    <span class="label">Diabetes:</span>
+                                    <span class="value">{% if prediction.diabetes == 1 %}Yes{% else %}No{% endif %}</span>
+                                </div>
+                                <div class="detail">
+                                    <span class="label">High BP:</span>
+                                    <span class="value">{% if prediction.high_blood_pressure == 1 %}Yes{% else %}No{% endif %}</span>
+                                </div>
+                                <div class="detail">
+                                    <span class="label">Smoking:</span>
+                                    <span class="value">{% if prediction.smoking == 1 %}Yes{% else %}No{% endif %}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <p>No assessments found for this patient.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.patient-header {
+    margin-bottom: 30px;
+}
+
+.back-link {
+    color: #0066cc;
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-block;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.back-link:hover {
+    color: #004699;
+    transform: translateX(-3px);
+}
+
+.patient-header h1 {
+    color: #333;
+    font-size: 2rem;
+    margin: 0;
+}
+
+.info-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.info-card {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border-top: 4px solid #0066cc;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.info-label {
+    color: #666;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.info-value {
+    color: #0066cc;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.timeline-container {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.timeline-container h2 {
+    color: #0066cc;
+    margin: 0 0 25px 0;
+    font-size: 1.5rem;
+    border-bottom: 2px solid #e8f4f8;
+    padding-bottom: 15px;
+}
+
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    top: 20px;
+    bottom: 0;
+    width: 2px;
+    background: #ddd;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 25px;
+}
+
+.timeline-bullet {
+    position: absolute;
+    left: -24px;
+    top: 8px;
+    width: 12px;
+    height: 12px;
+    background: #0066cc;
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px #0066cc;
+}
+
+.timeline-card {
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 6px;
+    border-left: 3px solid #0066cc;
+    transition: all 0.3s ease;
+}
+
+.timeline-card:hover {
+    background: white;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    display: flex;
+    gap: 15px;
+}
+
+.timeline-date {
+    color: #0066cc;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.risk-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: white;
+    white-space: nowrap;
+}
+
+.risk-badge.low-risk {
+    background: #27ae60;
+}
+
+.risk-badge.medium-risk {
+    background: #f39c12;
+}
+
+.risk-badge.high-risk {
+    background: #e74c3c;
+}
+
+.timeline-details {
+    padding-top: 10px;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+}
+
+.detail {
+    display: flex;
+    justify-content: space-between;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 0.9rem;
+}
+
+.detail .label {
+    color: #666;
+    font-weight: 500;
+}
+
+.detail .value {
+    color: #333;
+    font-weight: 600;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+    background: #f9f9f9;
+    border-radius: 4px;
+}
+
+.empty-state p {
+    margin: 0;
+    font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+    .timeline {
+        padding-left: 20px;
+    }
+
+    .timeline::before {
+        left: 6px;
+    }
+
+    .timeline-bullet {
+        left: -18px;
+    }
+
+    .timeline-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}
