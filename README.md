@@ -1,6 +1,16 @@
 # Coronary Artery Disease (CAD) Prediction System
 
-A professional, production-ready machine learning system for predicting Coronary Artery Disease risk. Built with multiple algorithms, comprehensive hyperparameter tuning, and a modern healthcare-focused web interface.
+A professional, production-ready machine learning system for predicting Coronary Artery Disease risk. Built with multiple algorithms, comprehensive hyperparameter tuning, cloud-based MongoDB database, and multi-user authentication with a modern healthcare-focused web interface.
+
+## ✨ What's New (v2.0)
+
+### Cloud Database Integration
+- **MongoDB Atlas**: Cloud-based data persistence for multi-machine access
+- **User Accounts**: Registration and authentication system
+- **Role-Based Access**: Patient and Doctor user roles
+- **Data Security**: Werkzeug password hashing (PBKDF2)
+- **Profile Management**: User-specific patient and doctor profiles
+- **Prediction History**: Track assessments per user
 
 ## Features
 
@@ -13,20 +23,30 @@ A professional, production-ready machine learning system for predicting Coronary
 - **Feature Importance**: Identifies most influential health factors
 - **Model Comparison**: Detailed metrics for all algorithms
 
+### Authentication & User Management
+- **Registration**: Patient and Doctor user registration
+- **Secure Authentication**: Email/password login with session management
+- **Multi-Role Support**: Different dashboards for patients and doctors
+- **User Profiles**: Persistent user data in MongoDB Atlas
+- **Access Control**: Role-based dashboard access
+- **Session Management**: HttpOnly, SameSite=Strict cookie security
+
 ### Backend (Flask API)
 - **REST Endpoints**: Multiple endpoints for predictions and data retrieval
 - **Risk Categorization**: Three-tier risk assessment (Low/Medium/High)
 - **Probability Prediction**: Returns CAD probability with confidence
-- **Prediction Logging**: All predictions saved to CSV for audit trail
+- **Prediction Logging**: All predictions saved to MongoDB with user tracking
 - **JSON API**: Integration-ready endpoints for third-party systems
 - **Error Handling**: Comprehensive error messages and validation
+- **MongoDB Integration**: Cloud database for scalable data storage
 
 ### Frontend (HTML/CSS)
 - **Professional Design**: Healthcare-themed blue, white, and green color scheme
 - **Responsive Layout**: Fully mobile-responsive design
-- **Clean Interface**: Intuitive form with clear labels and tooltips
+- **Clean Interface**: Intuitive forms with clear labels and tooltips
 - **Result Display**: Color-coded risk categories with recommendations
-- **Navigation**: Home, Predict, and About pages
+- **User Dashboards**: Patient and Doctor specific interfaces
+- **Navigation**: Home, Register, Login, Predict, Profile, and About pages
 - **Accessibility**: Semantic HTML5 and proper structure
 
 ## Project Structure
@@ -34,52 +54,115 @@ A professional, production-ready machine learning system for predicting Coronary
 ```
 CAD_Prediction_System/
 ├── backend/
+│   ├── app_mongodb.py           # Flask + MongoDB (RECOMMENDED - Production)
+│   ├── app.py                   # Legacy Flask + SQLite version
 │   ├── ml_model.py              # Model training with multiple algorithms
-│   ├── app.py                   # Flask backend API
+│   ├── model.py                 # Alternative model implementation
 │   ├── best_cad_model.pkl       # Trained Random Forest model
 │   ├── scaler.pkl               # Feature scaler
 │   ├── model_metrics.pkl        # Model comparison metrics
 │   ├── feature_importance.csv   # Feature importance rankings
-│   ├── predictions.csv          # Prediction audit log
-│   └── test_prediction.py       # Testing utilities
+│   ├── predictions.csv          # Prediction audit log (old version)
+│   ├── test_mongodb.py          # MongoDB integration tests
+│   ├── test_prediction.py       # Prediction testing utilities
+│   └── test_auth.py             # Authentication tests
 ├── frontend/
 │   ├── static/
 │   │   └── style.css            # Responsive styling
 │   └── templates/
 │       ├── base.html            # Base template with navbar
-│       ├── index.html           # Home/Prediction form
-│       ├── result.html          # Prediction results display
-│       └── about.html           # System information
+│       ├── index.html           # Home page
+│       ├── login.html           # User login form
+│       ├── register_patient.html # Patient registration
+│       ├── register_doctor.html  # Doctor registration
+│       ├── predict.html          # CAD prediction form
+│       ├── prediction_result.html # Results display
+│       ├── patient_dashboard.html # Patient dashboard
+│       ├── doctor_dashboard.html  # Doctor dashboard
+│       ├── profile.html          # User profile page
+│       ├── about.html            # System information
+│       └── (other templates)
 ├── dataset/
 │   └── heart.csv                # Heart disease dataset (299 samples)
+├── .env                         # Environment variables (MongoDB credentials)
+├── .env.example                 # Environment template (credentials removed)
 ├── requirements.txt             # Python dependencies
-└── README.md                    # This file
+├── README.md                    # This file
+│
+├── DOCUMENTATION_INDEX.md       # ⭐ Master documentation guide
+├── QUICK_VERIFICATION_GUIDE.md  # Step-by-step testing guide
+├── MONGODB_REGISTRATION_LOGIN_FIX.md # Detailed fix explanation
+├── FIXES_SUMMARY.md             # Technical changes summary
+├── CODE_CHANGES_BEFORE_AFTER.md # Code review with comparisons
+├── MONGODB_ATLAS_NAVIGATION.md  # Visual guide to MongoDB Atlas
+├── MONGODB_FIX_EXECUTIVE_SUMMARY.md # High-level overview
+└── FILES_MODIFIED_AND_DOCUMENTATION.md # Complete change log
 ```
 
 ## Quick Start
 
-### 1. Install Dependencies
+### Option 1: MongoDB Atlas Version (Recommended for Production)
+
+#### 1. Install Dependencies
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-### 2. Train the Model
+#### 2. Configure MongoDB Atlas
+
+1. Create a MongoDB Atlas account at https://www.mongodb.com/cloud/atlas
+2. Create a free M0 cluster
+3. Copy your connection string
+4. Update `.env` file:
+   ```
+   MONGODB_URL=mongodb+srv://username:password@cluster.mongodb.net/cad_prediction_db?retryWrites=true&w=majority&appName=cadprediction1
+   ```
+5. **Important:** Replace credentials and cluster name in your `.env` file
+
+#### 3. Train the Model
 
 ```bash
 cd backend
 python ml_model.py
 ```
 
-This will:
-- Load and preprocess the heart disease dataset
-- Train 3 different ML algorithms
-- Perform GridSearchCV hyperparameter tuning
-- Evaluate models with 5-fold cross-validation
-- Save the best model (Random Forest with F1-Score: 0.7059)
-- Generate feature importance analysis
+#### 4. Start the MongoDB-Enabled Application
 
-### 3. Start the Web Application
+```bash
+cd backend
+python app_mongodb.py
+```
+
+The server will start at: **http://127.0.0.1:5000**
+
+#### 5. Access the System
+
+Open your browser and navigate to:
+- **Home/Login**: http://127.0.0.1:5000/ (redirects to login)
+- **Register Patient**: http://127.0.0.1:5000/register_patient
+- **Register Doctor**: http://127.0.0.1:5000/register_doctor
+- **Patient Dashboard**: http://127.0.0.1:5000/patient_dashboard (after login)
+- **Doctor Dashboard**: http://127.0.0.1:5000/doctor_dashboard (after login)
+
+---
+
+### Option 2: SQLite Version (Legacy - Single Machine Only)
+
+#### 1. Install Dependencies
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+#### 2. Train the Model
+
+```bash
+cd backend
+python ml_model.py
+```
+
+#### 3. Start the Local Application
 
 ```bash
 cd backend
@@ -88,7 +171,7 @@ python app.py
 
 The server will start at: **http://127.0.0.1:5000**
 
-### 4. Access the System
+#### 4. Access the System
 
 Open your browser and navigate to:
 - **Home/Prediction**: http://127.0.0.1:5000/
@@ -122,7 +205,110 @@ Open your browser and navigate to:
 4. **Age** (0.0664) - Patient age
 5. **CPK** (0.0551) - Enzyme level
 
-## Input Parameters
+---
+
+## MongoDB Atlas Setup
+
+### Prerequisites
+
+- MongoDB Atlas account (free at https://www.mongodb.com/cloud/atlas)
+- Free M0 cluster (0-512 MB storage)
+- Network access from your machine
+
+### Setup Steps
+
+1. **Create MongoDB Atlas Cluster**
+   - Go to: https://www.mongodb.com/cloud/atlas
+   - Sign up or login
+   - Create new cluster
+   - Select: M0 Free Tier
+   - Choose region closest to you
+
+2. **Get Connection String**
+   - Click: "Connect" button on cluster
+   - Choose: "Connect your application"
+   - Copy the connection string
+   - It should include `mongodb+srv://`
+
+3. **Create `.env` File**
+   ```
+   MONGODB_URL=mongodb+srv://username:password@cluster.mongodb.net/cad_prediction_db?retryWrites=true&w=majority&appName=cadprediction1
+   FLASK_SECRET_KEY=your-secret-key
+   ```
+
+4. **Verify Connection**
+   - Start app: `python app_mongodb.py`
+   - Should see: "✓ MONGODB ATLAS CONNECTION SUCCESSFUL!"
+
+### Accessing Your Data
+
+1. Go to: https://cloud.mongodb.com
+2. Click: "Browse Collections"
+3. Select database: `cad_prediction_db`
+4. View collections:
+   - `users` - User accounts and credentials
+   - `patient_profiles` - Patient-specific data
+   - `doctor_profiles` - Doctor-specific data
+   - `assessments` - CAD predictions and history
+
+---
+
+## Authentication System
+
+### User Registration
+
+**Patient Registration**: `/register_patient`
+- Username (3+ characters)
+- Email address
+- Password (6+ characters)
+- Creates patient profile in MongoDB
+
+**Doctor Registration**: `/register_doctor`
+- Username (3+ characters)
+- Email address
+- Password (6+ characters)
+- Creates doctor profile in MongoDB
+
+### User Login
+
+**Login Page**: `/login`
+- Username or email
+- Password (case-sensitive)
+- Session-based authentication
+- Redirects to appropriate dashboard
+
+### User Roles
+
+**Patient Dashboard** (`/patient_dashboard`)
+- View personal CAD risk assessment
+- Input health parameters
+- Get risk predictions
+- View personal recommendation history
+- Manage profile
+
+**Doctor Dashboard** (`/doctor_dashboard`)
+- View patient referrals
+- Access team assessment tools
+- Monitor CAD risk trends
+- Patient management interface
+
+---
+
+## Documentation
+
+### Complete Documentation Guides
+
+| Document | Purpose | Best For |
+|----------|---------|----------|
+| **DOCUMENTATION_INDEX.md** | Navigation guide to all files | Finding what you need |
+| **QUICK_VERIFICATION_GUIDE.md** | Step-by-step testing | Verifying the system works |
+| **MONGODB_REGISTRATION_LOGIN_FIX.md** | Detailed technical explanation | Understanding the implementation |
+| **MONGODB_ATLAS_NAVIGATION.md** | Visual guide to MongoDB Atlas | Viewing data in the cloud |
+| **CODE_CHANGES_BEFORE_AFTER.md** | Side-by-side code comparison | Code review |
+
+**Start here:** [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)
+
+---
 
 The system analyzes 12 patient health indicators:
 
@@ -216,48 +402,36 @@ The system analyzes 12 patient health indicators:
 
 ## Key Files Explained
 
-### ml_model.py
-Comprehensive model training pipeline:
-- Loads heart disease dataset
-- Performs data preprocessing and scaling
-- Trains multiple algorithms with GridSearchCV
-- Evaluates models with cross-validation
-- Saves best model and scaler
-- Generates feature importance analysis
+### MongoDB Version (Recommended)
 
-### app.py
-Flask backend application:
-- Loads trained model and scaler
-- Provides prediction endpoints
-- Implements risk categorization logic
-- Logs all predictions to CSV
-- Serves HTML templates
-- Provides JSON APIs
+#### app_mongodb.py
+Flask backend application with MongoDB integration:
+- Connects to MongoDB Atlas cloud database
+- User registration and authentication
+- Role-based access control (Patient/Doctor)
+- CAD prediction endpoints
+- User profile management
+- Detailed logging for debugging
+- Session-based security
+- Password hashing with werkzeug
 
-### index.html
-Home page with prediction form:
-- Professional healthcare design
-- Color-coded input groups
-- Form validation and hints
-- Clear button interface
-- Medical disclaimer
+#### test_mongodb.py
+Comprehensive test suite for MongoDB integration:
+- Tests connection to MongoDB Atlas
+- Tests user registration
+- Tests login authentication
+- Tests role-based access
+- Tests prediction workflow
+- 8/8 tests passing
 
-### result.html
-Prediction results page:
-- Color-coded risk badges
-- Probability visualization bar
-- Risk category information
-- Medical recommendations
-- Contributing features display
-- Navigation back to form
+### Legacy Version (SQLite)
 
-### about.html
-Comprehensive system documentation:
-- Algorithm descriptions
-- Input parameter explanations
-- Risk category guidelines
-- Technology stack details
-- Medical disclaimers
+#### app.py
+Flask backend with local SQLite database:
+- Predictions without user management
+- No authentication
+- Single machine only
+- Simple form-based predictions
 
 ## Technologies Used
 
@@ -267,13 +441,21 @@ Comprehensive system documentation:
 - **NumPy** - Numerical computing
 
 ### Backend
-- **Flask** - Web framework
+- **Flask** - Web framework for routing and templating
 - **Python 3.8+** - Programming language
+- **pymongo** - MongoDB driver
+- **werkzeug** - Password hashing and security utilities
+- **python-dotenv** - Environment variable management
+
+### Database
+- **MongoDB Atlas** - Cloud-hosted NoSQL database
+- **PyMongo 4.6.0+** - MongoDB Python driver
 
 ### Frontend
-- **HTML5** - Structure
+- **HTML5** - Semantic structure
 - **CSS3** - Responsive styling
-- **Jinja2** - Template rendering
+- **Jinja2** - Server-side template rendering
+- **Bootstrap-ready** - Mobile-responsive CSS framework
 
 ## Dataset Information
 
@@ -285,11 +467,39 @@ Comprehensive system documentation:
 
 ## Security Considerations
 
-- Input validation on all form fields
-- Type checking for numeric inputs
-- File-based model storage (secure pickle)
-- Prediction logging for audit trails
-- Error handling without sensitive info leakage
+### Data Protection
+- Input validation on all form fields and API endpoints
+- Type checking for numeric inputs and range validation
+- SQL injection prevention (using parametric queries in MongoDB)
+- XSS prevention through Jinja2 template escaping
+
+### Authentication & Authorization
+- Passwords hashed using werkzeug (PBKDF2 with salt)
+- Raw passwords never stored or transmitted in plain text
+- Session-based authentication with HTTPOnly cookies
+- SameSite=Strict cookie policy for CSRF prevention
+- Role-based access control (Patient vs Doctor)
+- Session timeout on browser closure
+
+### MongoDB Security
+- Connection string requires username and password
+- `.env` file contains credentials (NOT in git repository)
+- `.env.example` provided as template without credentials
+- MongoDB Atlas IP whitelist for network access control
+- TLS/SSL encryption for data in transit
+- Database isolation per application
+
+### File-Based Storage (Legacy)
+- Pickle files stored securely on filesystem
+- Model and scaler files protected from unauthorized access
+- Prediction logs saved for audit trails
+
+### Additional Security Measures
+- No sensitive information in error messages
+- Unique indexes on username and email prevent duplicates
+- Password minimum requirements (6+ characters)
+- Rate limiting recommended for production deployment
+- HTTPS recommended for production
 
 ## Files Generated
 
@@ -315,13 +525,23 @@ The predictions generated by this machine learning system:
 
 ## Contributing
 
-To improve the system:
-1. Train with larger datasets
-2. Add more advanced algorithms (XGBoost with dependencies)
-3. Implement SHAP/LIME for better feature explanations
-4. Add user authentication and database storage
-5. Implement patient history tracking
-6. Add DICOM image analysis capabilities
+### Completed Features
+- ✅ User authentication with role-based access
+- ✅ MongoDB Atlas cloud database integration
+- ✅ Patient and Doctor dashboards
+- ✅ Multi-algorithm comparison
+- ✅ Comprehensive logging and debugging
+- ✅ Responsive mobile design
+
+### Future Improvements
+1. Advanced algorithms (XGBoost, Neural Networks)
+2. SHAP/LIME for explainable AI
+3. Patient history tracking and trends
+4. Doctor-patient messaging system
+5. DICOM image analysis for cardiac imaging
+6. Mobile app (React/Flutter)
+7. Advanced analytics dashboard
+8. Integration with EHR systems
 
 ## References
 
@@ -333,10 +553,37 @@ To improve the system:
 ## Support
 
 For issues or questions:
-1. Check the About page for system documentation
-2. Review error messages carefully
-3. Ensure all dependencies are installed
-4. Check that the model files (*.pkl) are present
+
+### Getting Help
+
+1. **Quick Setup Issues:**
+   - Read: [QUICK_VERIFICATION_GUIDE.md](QUICK_VERIFICATION_GUIDE.md)
+   - Follow step-by-step verification procedures
+
+2. **MongoDB Connection Issues:**
+   - Read: [MONGODB_ATLAS_NAVIGATION.md](MONGODB_ATLAS_NAVIGATION.md)
+   - Verify connection string in `.env` file
+   - Check MongoDB Atlas IP whitelist settings
+
+3. **Registration/Login Problems:**
+   - Read: [MONGODB_REGISTRATION_LOGIN_FIX.md](MONGODB_REGISTRATION_LOGIN_FIX.md)
+   - Check console output for detailed error messages
+   - Verify database credentials are correct
+
+4. **Understanding the Code:**
+   - Read: [CODE_CHANGES_BEFORE_AFTER.md](CODE_CHANGES_BEFORE_AFTER.md)
+   - Read: [FIXES_SUMMARY.md](FIXES_SUMMARY.md)
+
+### Troubleshooting Checklist
+
+- [ ] All dependencies installed: `pip install -r requirements.txt`
+- [ ] `.env` file created with MongoDB credentials
+- [ ] MongoDB Atlas cluster created and running
+- [ ] Connection string includes `/cad_prediction_db`
+- [ ] IP whitelist includes your machine's IP
+- [ ] Model files present: `best_cad_model.pkl`, `scaler.pkl`
+- [ ] App starts without import errors
+- [ ] Console shows "✓ MONGODB ATLAS CONNECTION SUCCESSFUL!"
 
 ## License
 
@@ -344,6 +591,17 @@ Educational and research use. Consult institution for deployment/commercial use.
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: February 2026  
-**Status**: Production Ready
+## Project Status
+
+**Version**: 2.0 - MongoDB Atlas Integration  
+**Release Date**: February 2026  
+**Status**: ✅ Production Ready  
+
+### Key Milestones
+- ✅ Phase 1: Core ML model training and evaluation
+- ✅ Phase 2: Flask web application with UI
+- ✅ Phase 3: MongoDB Atlas cloud integration
+- ✅ Phase 4: User authentication and role-based access
+- ✅ Phase 5: Comprehensive documentation and testing
+
+[**Start here:** Read DOCUMENTATION_INDEX.md for complete navigation guide](DOCUMENTATION_INDEX.md)

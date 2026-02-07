@@ -1,515 +1,841 @@
+# -*- coding: utf-8 -*-
 """
-CAD Prediction System - Multi-Role Professional Edition
-Features: Patient & Doctor roles, role-based dashboards, prediction history
+CAD Prediction System - MongoDB Atlas Edition
+Features: Patient & Doctor roles, MongoDB shared database, role-based dashboards
+Supports multi-user access from different machines
 """
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, Response
-import io
-import csv
 from werkzeug.security import generate_password_hash, check_password_hash
+from pymongo import MongoClient
+from pymongo.errors import DuplicateKeyError, ServerSelectionTimeoutError
+from bson.objectid import ObjectId
+from datetime import datetime, timedelta
 import numpy as np
 import pickle
 from pathlib import Path
 import pandas as pd
-from datetime import datetime, timedelta
 import json
 import os
-import sqlite3
+import io
+import csv
 from functools import wraps
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 
-# ===== SETUP =====
+# ===== CONFIGURATION =====
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATE_DIR = str(BASE_DIR.parent / "frontend" / "templates")
 STATIC_DIR = str(BASE_DIR.parent / "frontend" / "static")
 
+# Flask App Setup
 app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 app.config['SESSION_COOKIE_SECURE'] = False
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 
-DB_PATH = BASE_DIR / "cad_system.db"
+# MongoDB Atlas Connection String
+# Get from environment variable or use default (UPDATE WITH YOUR ATLAS CONNECTION STRING)
+MONGODB_URL = os.environ.get(
+    'MONGODB_URL',
+    'mongodb+srv://<username>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority'
+)
+
+# Database and collection names
+DB_NAME = 'cad_prediction_db'
+COLLECTION_USERS = 'users'
+COLLECTION_ASSESSMENTS = 'assessments'
+COLLECTION_PATIENT_PROFILES = 'patient_profiles'
+COLLECTION_DOCTOR_PROFILES = 'doctor_profiles'
+
+# Model paths
 MODEL_PATH = BASE_DIR / "best_cad_model.pkl"
 SCALER_PATH = BASE_DIR / "scaler.pkl"
+DATA_PATH = BASE_DIR.parent / "dataset" / "heart.csv"
 
-# ===== DATABASE FUNCTIONS =====
-def init_db():
-    """Initialize SQLite database with users and predictions tables"""
-    try:
-        conn = sqlite3.connect(str(DB_PATH))
-        c = conn.cursor()
-        
-        # Users table with role column (patient or doctor)
-        c.execute('''CREATE TABLE IF NOT EXISTS users (
-                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                     username TEXT UNIQUE NOT NULL,
-                     email TEXT,
-                     password_hash TEXT NOT NULL,
-                     role TEXT NOT NULL,
-                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-        
-        # Predictions table to store patient predictions
-        c.execute('''CREATE TABLE IF NOT EXISTS predictions (
-                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                     user_id INTEGER NOT NULL,
-                     age REAL,
-                     anaemia INTEGER,
-                     creatinine_phosphokinase REAL,
-                     diabetes INTEGER,
-                     ejection_fraction REAL,
-                     high_blood_pressure INTEGER,
-                     platelets REAL,
-                     serum_creatinine REAL,
-                     serum_sodium REAL,
-                     sex INTEGER,
-                     smoking INTEGER,
-                     time REAL,
-                     probability REAL,
-                     risk_category TEXT,
-                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                     FOREIGN KEY(user_id) REFERENCES users(id))''')
-        
-        conn.commit()
-        conn.close()
-        print("✓ Database initialized with users and predictions tables")
-    except Exception as e:
-        print(f"⚠ Database error: {e}")
+# Global MongoDB client and database
+mongoclient = None
+db = None
 
-def register_user(username, email, password, role):
-    """Register a new user (patient or doctor)"""
-    if not username or len(username) < 3:
-        return False, "Username must be at least 3 characters"
-    if not password or len(password) < 6:
-        return False, "Password must be at least 6 characters"
-    if role not in ['patient', 'doctor']:
-        return False, "Invalid role"
+# ===== MONGODB CONNECTION MANAGEMENT =====
+
+def init_mongodb():
+    """
+    Initialize MongoDB Atlas connection and create necessary indexes.
+    Called once at app startup with detailed logging.
+    """
+    global mongoclient, db
+    
+    print(f"\n{'='*80}")
+    print("MONGODB ATLAS CONNECTION INITIALIZATION")
+    print(f"{'='*80}")
     
     try:
-        conn = sqlite3.connect(str(DB_PATH))
-        c = conn.cursor()
+        print("\n📍 Step 1: Establishing connection to MongoDB Atlas...")
+        print(f"   Database Name: {DB_NAME}")
+        print(f"   Collections: {COLLECTION_USERS}, {COLLECTION_ASSESSMENTS}")
         
-        c.execute('SELECT id FROM users WHERE username = ?', (username,))
-        if c.fetchone():
-            conn.close()
+        mongoclient = MongoClient(MONGODB_URL, serverSelectionTimeoutMS=5000)
+        
+        print("\n📍 Step 2: Testing connection with ping command...")
+        mongoclient.admin.command('ping')
+        print("   ✓ Ping successful!")
+        
+        print("\n📍 Step 3: Selecting database...")
+        db = mongoclient[DB_NAME]
+        print(f"   ✓ Connected to database: '{DB_NAME}'")
+        
+        print("\n📍 Step 4: Creating indexes for fast queries...")
+        
+        # Users collection indexes
+        db[COLLECTION_USERS].create_index('username', unique=True)
+        print(f"   ✓ Index created: {COLLECTION_USERS}.username (unique)")
+        
+        db[COLLECTION_USERS].create_index('email', unique=True)
+        print(f"   ✓ Index created: {COLLECTION_USERS}.email (unique)")
+        
+        # Assessments collection indexes
+        db[COLLECTION_ASSESSMENTS].create_index('user_id')
+        print(f"   ✓ Index created: {COLLECTION_ASSESSMENTS}.user_id")
+        
+        db[COLLECTION_ASSESSMENTS].create_index('created_at')
+        print(f"   ✓ Index created: {COLLECTION_ASSESSMENTS}.created_at")
+        
+        print(f"\n{'='*80}")
+        print("✓ MONGODB ATLAS CONNECTION SUCCESSFUL!")
+        print(f"{'='*80}")
+        print(f"\n📝 Data will be stored at:")
+        print(f"   Database: {DB_NAME}")
+        print(f"   Collections:")
+        print(f"   • {COLLECTION_USERS} ← User accounts (username, email, password_hash, role)")
+        print(f"   • {COLLECTION_PATIENT_PROFILES} ← Patient profiles")
+        print(f"   • {COLLECTION_DOCTOR_PROFILES} ← Doctor profiles")
+        print(f"   • {COLLECTION_ASSESSMENTS} ← CAD assessments/predictions")
+        print(f"\n🌐 View data in MongoDB Atlas:")
+        print(f"   1. Open: https://cloud.mongodb.com")
+        print(f"   2. Click: Clusters")
+        print(f"   3. Click: Browse Collections")
+        print(f"   4. Select database: {DB_NAME}")
+        print(f"   5. Click on collections to view documents")
+        print(f"\n{'='*80}\n")
+        
+        return True
+        
+    except ServerSelectionTimeoutError as e:
+        print(f"✗ FAILED: Cannot connect to MongoDB Atlas")
+        print(f"   Error: {e}")
+        print(f"\n   Troubleshooting:")
+        print(f"   1. Check internet connection")
+        print(f"   2. Verify MongoDB URI in .env file")
+        print(f"   3. Check IP whitelist in MongoDB Atlas")
+        print(f"   4. Ensure cluster is running")
+        print(f"{'='*80}\n")
+        return False
+    except Exception as e:
+        print(f"✗ FAILED: {e}")
+        print(f"{'='*80}\n")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def get_db():
+    """
+    Get MongoDB database instance.
+    Ensures connection is active before returning.
+    """
+    global db
+    if db is None:
+        raise RuntimeError("MongoDB not initialized. Call init_mongodb() first.")
+    return db
+
+# ===== DATABASE FUNCTIONS =====
+
+def register_user(username, email, password, role):
+    """
+    Register a new user (patient or doctor) in MongoDB.
+    Logs all steps to console for verification in MongoDB Atlas Data Explorer.
+    
+    Args:
+        username: Unique username (min 3 chars)
+        email: User email address
+        password: Plain password (will be hashed)
+        role: 'patient' or 'doctor'
+    
+    Returns:
+        (success: bool, message: str)
+    """
+    print(f"\n{'='*80}")
+    print(f"[REGISTRATION START] Username: {username}, Email: {email}, Role: {role}")
+    print(f"{'='*80}")
+    
+    if not username or len(username) < 3:
+        print(f"✗ Validation failed: Username too short")
+        return False, "Username must be at least 3 characters"
+    if not password or len(password) < 6:
+        print(f"✗ Validation failed: Password too short")
+        return False, "Password must be at least 6 characters"
+    if role not in ['patient', 'doctor']:
+        print(f"✗ Validation failed: Invalid role '{role}'")
+        return False, "Invalid role. Must be 'patient' or 'doctor'"
+    
+    try:
+        db = get_db()
+        print(f"✓ Database connection obtained: {DB_NAME}")
+        
+        # Check if username or email already exists
+        existing_user = db[COLLECTION_USERS].find_one({'username': username})
+        if existing_user:
+            print(f"✗ Username '{username}' already exists in {COLLECTION_USERS} collection")
             return False, "Username already exists"
         
+        existing_email = db[COLLECTION_USERS].find_one({'email': email})
+        if existing_email:
+            print(f"✗ Email '{email}' already registered in {COLLECTION_USERS} collection")
+            return False, "Email already registered"
+        
+        print(f"✓ Username and email are unique")
+        
+        # Hash the password using werkzeug
         password_hash = generate_password_hash(password)
-        c.execute('INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
-                  (username, email, password_hash, role))
-        conn.commit()
-        conn.close()
+        print(f"✓ Password hashed successfully")
+        
+        # Create user document
+        user_doc = {
+            'username': username,
+            'email': email,
+            'password_hash': password_hash,
+            'role': role,
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow()
+        }
+        
+        print(f"→ Inserting user document into MongoDB...")
+        print(f"   Database: {DB_NAME}")
+        print(f"   Collection: {COLLECTION_USERS}")
+        print(f"   Document: {{username, email, password_hash, role, created_at, updated_at}}")
+        
+        # Insert into users collection
+        result = db[COLLECTION_USERS].insert_one(user_doc)
+        user_id = result.inserted_id
+        
+        print(f"✓ User inserted successfully!")
+        print(f"   User ID (MongoDB _id): {user_id}")
+        print(f"   Status: Ready to login at http://127.0.0.1:5000/login")
+        
+        # Create role-specific profile documents
+        if role == 'patient':
+            patient_profile = {
+                'user_id': user_id,
+                'age': None,
+                'gender': None,
+                'medical_history': [],
+                'created_at': datetime.utcnow()
+            }
+            db[COLLECTION_PATIENT_PROFILES].insert_one(patient_profile)
+            print(f"✓ Patient profile created in {COLLECTION_PATIENT_PROFILES} collection")
+        
+        elif role == 'doctor':
+            doctor_profile = {
+                'user_id': user_id,
+                'license_number': None,
+                'specialization': None,
+                'hospital': None,
+                'created_at': datetime.utcnow()
+            }
+            db[COLLECTION_DOCTOR_PROFILES].insert_one(doctor_profile)
+            print(f"✓ Doctor profile created in {COLLECTION_DOCTOR_PROFILES} collection")
+        
+        print(f"\n✓ USER REGISTRATION COMPLETE")
+        print(f"   To view in MongoDB Atlas:")
+        print(f"   1. Open https://cloud.mongodb.com")
+        print(f"   2. Go to: Clusters → Browse Collections")
+        print(f"   3. Database: {DB_NAME}")
+        print(f"   4. Collection: {COLLECTION_USERS}")
+        print(f"   5. Find document with username: '{username}'")
+        print(f"\n{'='*80}\n")
         
         return True, "Registration successful"
+        
+    except DuplicateKeyError as e:
+        print(f"✗ DuplicateKeyError: {e}")
+        return False, "Username or email already exists"
     except Exception as e:
+        print(f"✗ Registration error: {e}")
+        import traceback
+        traceback.print_exc()
         return False, f"Registration error: {str(e)}"
 
 def login_user(username, password):
-    """Validate user credentials and return user info with role"""
+    """
+    Validate user credentials against MongoDB.
+    Logs all steps to console for verification.
+    
+    Args:
+        username: Username to login
+        password: Plain password to verify
+    
+    Returns:
+        (success: bool, user_info: dict or None)
+        user_info = {'user_id': ObjectId, 'role': str, 'username': str}
+    """
+    print(f"\n{'='*80}")
+    print(f"[LOGIN ATTEMPT] Username: {username}")
+    print(f"{'='*80}")
+    
     try:
-        conn = sqlite3.connect(str(DB_PATH))
-        c = conn.cursor()
-        c.execute('SELECT id, password_hash, role, username FROM users WHERE username = ?', (username,))
-        user = c.fetchone()
-        conn.close()
+        db = get_db()
+        print(f"✓ Database connection obtained: {DB_NAME}")
         
-        if user and check_password_hash(user[1], password):
-            return True, {'user_id': user[0], 'role': user[2], 'username': user[3]}
-        return False, None
+        # Find user by username
+        print(f"→ Searching for user in {COLLECTION_USERS} collection...")
+        user = db[COLLECTION_USERS].find_one({'username': username})
+        
+        if not user:
+            print(f"✗ User '{username}' NOT found in database")
+            print(f"   Make sure you registered first at: http://127.0.0.1:5000/register")
+            print(f"{'='*80}\n")
+            return False, None
+        
+        print(f"✓ User found in database!")
+        print(f"   User ID: {user['_id']}")
+        print(f"   Role: {user['role']}")
+        
+        # Verify password hash
+        print(f"→ Verifying password...")
+        is_password_valid = check_password_hash(user['password_hash'], password)
+        
+        if is_password_valid:
+            print(f"✓ Password verification SUCCESSFUL!")
+            user_info = {
+                'user_id': user['_id'],
+                'role': user['role'],
+                'username': user['username']
+            }
+            print(f"\n✓ LOGIN SUCCESSFUL")
+            print(f"   Username: {user['username']}")
+            print(f"   Role: {user['role']}")
+            print(f"   Redirecting to {user['role']} dashboard...")
+            print(f"{'='*80}\n")
+            return True, user_info
+        else:
+            print(f"✗ Password verification FAILED!")
+            print(f"   Entered password is incorrect")
+            print(f"{'='*80}\n")
+            return False, None
+        
     except Exception as e:
-        print(f"Login error: {e}")
+        print(f"✗ Login error: {e}")
+        import traceback
+        traceback.print_exc()
+        print(f"{'='*80}\n")
         return False, None
 
 def get_user_info(user_id):
-    """Get user info by ID"""
+    """
+    Retrieve user information from MongoDB by ID.
+    
+    Args:
+        user_id: MongoDB ObjectId
+    
+    Returns:
+        dict with user info or None
+    """
     try:
-        conn = sqlite3.connect(str(DB_PATH))
-        c = conn.cursor()
-        c.execute('SELECT id, username, email, role FROM users WHERE id = ?', (user_id,))
-        user = c.fetchone()
-        conn.close()
-        return user
-    except:
+        db = get_db()
+        
+        # Convert string ID to ObjectId if needed
+        if isinstance(user_id, str):
+            user_id = ObjectId(user_id)
+        
+        user = db[COLLECTION_USERS].find_one({'_id': user_id})
+        
+        if user:
+            return {
+                'id': str(user['_id']),
+                'username': user['username'],
+                'email': user['email'],
+                'role': user['role'],
+                'created_at': user.get('created_at')
+            }
+        return None
+        
+    except Exception as e:
+        print(f"Error fetching user info: {e}")
         return None
 
-def save_prediction(user_id, features, probability, risk_category):
-    """Save prediction to database"""
+def save_assessment(user_id, features, probability, risk_category):
+    """
+    Save a CAD prediction assessment to MongoDB assessments collection.
+    
+    Args:
+        user_id: MongoDB ObjectId of the patient
+        features: dict of medical features
+        probability: float between 0 and 1
+        risk_category: 'LOW', 'MEDIUM', or 'HIGH'
+    
+    Returns:
+        bool indicating success
+    """
     try:
-        conn = sqlite3.connect(str(DB_PATH))
-        c = conn.cursor()
+        db = get_db()
         
-        c.execute('''INSERT INTO predictions 
-                     (user_id, age, anaemia, creatinine_phosphokinase, diabetes, 
-                      ejection_fraction, high_blood_pressure, platelets, 
-                      serum_creatinine, serum_sodium, sex, smoking, time, 
-                      probability, risk_category)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                  (user_id, features['age'], features['anaemia'], 
-                   features['creatinine_phosphokinase'], features['diabetes'],
-                   features['ejection_fraction'], features['high_blood_pressure'],
-                   features['platelets'], features['serum_creatinine'],
-                   features['serum_sodium'], features['sex'], features['smoking'],
-                   features['time'], probability, risk_category))
+        # Convert string ID to ObjectId if needed
+        if isinstance(user_id, str):
+            user_id = ObjectId(user_id)
         
-        conn.commit()
-        conn.close()
+        # Create assessment document
+        assessment = {
+            'user_id': user_id,
+            'age': features.get('age'),
+            'anaemia': features.get('anaemia'),
+            'creatinine_phosphokinase': features.get('creatinine_phosphokinase'),
+            'diabetes': features.get('diabetes'),
+            'ejection_fraction': features.get('ejection_fraction'),
+            'high_blood_pressure': features.get('high_blood_pressure'),
+            'platelets': features.get('platelets'),
+            'serum_creatinine': features.get('serum_creatinine'),
+            'serum_sodium': features.get('serum_sodium'),
+            'sex': features.get('sex'),
+            'smoking': features.get('smoking'),
+            'time': features.get('time'),
+            'probability': probability,
+            'risk_category': risk_category,
+            'created_at': datetime.utcnow()
+        }
+        
+        db[COLLECTION_ASSESSMENTS].insert_one(assessment)
         return True
+        
     except Exception as e:
-        print(f"Error saving prediction: {e}")
+        print(f"Error saving assessment: {e}")
         return False
 
-def get_patient_predictions(user_id):
-    """Get all predictions for a specific patient"""
+def get_patient_assessments(user_id):
+    """
+    Get all assessments for a specific patient.
+    
+    Args:
+        user_id: MongoDB ObjectId of the patient
+    
+    Returns:
+        list of assessment dicts, sorted by date (newest first)
+    """
     try:
-        conn = sqlite3.connect(str(DB_PATH))
-        c = conn.cursor()
-        c.execute('''SELECT * FROM predictions WHERE user_id = ? ORDER BY created_at DESC''',
-                  (user_id,))
-        predictions = c.fetchall()
-        conn.close()
+        db = get_db()
+        
+        # Convert string ID to ObjectId if needed
+        if isinstance(user_id, str):
+            user_id = ObjectId(user_id)
+        
+        # Query assessments for this user, sorted by creation date descending
+        assessments = db[COLLECTION_ASSESSMENTS].find(
+            {'user_id': user_id}
+        ).sort('created_at', -1)
         
         result = []
-        for p in predictions:
+        for assessment in assessments:
             result.append({
-                'id': p[0],
-                'probability': p[14],
-                'risk_category': p[15],
-                'created_at': p[16],
-                'age': p[2],
-                'ejection_fraction': p[6]
+                'id': str(assessment['_id']),
+                'probability': assessment.get('probability'),
+                'risk_category': assessment.get('risk_category'),
+                'created_at': assessment.get('created_at'),
+                'age': assessment.get('age'),
+                'ejection_fraction': assessment.get('ejection_fraction')
             })
+        
         return result
+        
     except Exception as e:
-        print(f"Error fetching predictions: {e}")
+        print(f"Error fetching patient assessments: {e}")
         return []
 
 def get_all_patients():
-    """Get all patients for doctor dashboard"""
+    """
+    Get all patient users for doctor dashboard.
+    
+    Returns:
+        list of patient dicts with assessment counts
+    """
     try:
-        conn = sqlite3.connect(str(DB_PATH))
-        c = conn.cursor()
-        c.execute('SELECT id, username, email, created_at FROM users WHERE role = ?', ('patient',))
-        patients = c.fetchall()
-        conn.close()
+        db = get_db()
+        
+        # Find all users with role='patient'
+        patients = db[COLLECTION_USERS].find({'role': 'patient'})
         
         result = []
-        for p in patients:
-            # Count predictions for each patient
-            conn = sqlite3.connect(str(DB_PATH))
-            c = conn.cursor()
-            c.execute('SELECT COUNT(*) FROM predictions WHERE user_id = ?', (p[0],))
-            pred_count = c.fetchone()[0]
-            conn.close()
+        for patient in patients:
+            patient_id = patient['_id']
+            
+            # Count assessments for this patient
+            assessment_count = db[COLLECTION_ASSESSMENTS].count_documents(
+                {'user_id': patient_id}
+            )
             
             result.append({
-                'id': p[0],
-                'username': p[1],
-                'email': p[2],
-                'registered': p[3],
-                'predictions_count': pred_count,
-                # Backwards-compatible key expected by tests and templates
-                'prediction_count': pred_count
+                'id': str(patient_id),
+                'username': patient['username'],
+                'email': patient.get('email'),
+                'registered': patient.get('created_at'),
+                'predictions_count': assessment_count,
+                'prediction_count': assessment_count  # Backwards compatible
             })
         
         return result
+        
     except Exception as e:
         print(f"Error fetching patients: {e}")
         return []
 
-def get_all_predictions():
-    """Return all patient predictions joined with patient username for doctors"""
+def get_all_assessments():
+    """
+    Get all patient assessments for doctor view.
+    Joins assessment data with patient usernames.
+    
+    Returns:
+        list of assessment dicts with patient info
+    """
     try:
-        conn = sqlite3.connect(str(DB_PATH))
-        c = conn.cursor()
-        # Join predictions with users to get username and return full feature set
-        c.execute('''SELECT p.id, p.user_id, u.username, p.age, p.anaemia,
-                            p.creatinine_phosphokinase, p.diabetes, p.ejection_fraction,
-                            p.high_blood_pressure, p.platelets, p.serum_creatinine,
-                            p.serum_sodium, p.sex, p.smoking, p.time, p.probability,
-                            p.risk_category, p.created_at
-                     FROM predictions p
-                     JOIN users u ON p.user_id = u.id
-                     ORDER BY p.created_at DESC''')
-        rows = c.fetchall()
-        conn.close()
-
+        db = get_db()
+        
+        # Query all assessments, sorted by date descending
+        assessments = db[COLLECTION_ASSESSMENTS].find().sort('created_at', -1)
+        
         results = []
-        for r in rows:
-            # map columns to dict
+        for assessment in assessments:
+            user_id = assessment['user_id']
+            
+            # Get patient username
+            user = db[COLLECTION_USERS].find_one({'_id': user_id})
+            username = user['username'] if user else 'Unknown'
+            
             results.append({
-                'id': r[0],
-                'user_id': r[1],
-                'username': r[2],
+                'id': str(assessment['_id']),
+                'user_id': str(user_id),
+                'username': username,
                 'features': {
-                    'age': r[3], 'anaemia': r[4], 'creatinine_phosphokinase': r[5],
-                    'diabetes': r[6], 'ejection_fraction': r[7], 'high_blood_pressure': r[8],
-                    'platelets': r[9], 'serum_creatinine': r[10], 'serum_sodium': r[11],
-                    'sex': r[12], 'smoking': r[13], 'time': r[14]
+                    'age': assessment.get('age'),
+                    'anaemia': assessment.get('anaemia'),
+                    'creatinine_phosphokinase': assessment.get('creatinine_phosphokinase'),
+                    'diabetes': assessment.get('diabetes'),
+                    'ejection_fraction': assessment.get('ejection_fraction'),
+                    'high_blood_pressure': assessment.get('high_blood_pressure'),
+                    'platelets': assessment.get('platelets'),
+                    'serum_creatinine': assessment.get('serum_creatinine'),
+                    'serum_sodium': assessment.get('serum_sodium'),
+                    'sex': assessment.get('sex'),
+                    'smoking': assessment.get('smoking'),
+                    'time': assessment.get('time')
                 },
-                'probability': r[15],
-                'risk_category': r[16],
-                'created_at': r[17]
+                'probability': assessment.get('probability'),
+                'risk_category': assessment.get('risk_category'),
+                'created_at': assessment.get('created_at')
             })
-
+        
         return results
+        
     except Exception as e:
-        print(f"Error fetching all predictions: {e}")
+        print(f"Error fetching all assessments: {e}")
         return []
 
-
-def get_predictions_paginated(page=1, per_page=10, risk=None, username=None, start_date=None, end_date=None):
-    """Return paginated predictions with optional filters and total count."""
+def get_assessments_paginated(page=1, per_page=10, risk=None, username=None, start_date=None, end_date=None):
+    """
+    Get paginated assessments with optional filters.
+    
+    Args:
+        page: Page number (1-indexed)
+        per_page: Results per page
+        risk: Filter by risk_category ('LOW', 'MEDIUM', 'HIGH')
+        username: Filter by patient username (substring match)
+        start_date: Filter assessments from this date
+        end_date: Filter assessments until this date
+    
+    Returns:
+        dict with 'assessments' list and 'total' count
+    """
     try:
-        conn = sqlite3.connect(str(DB_PATH))
-        c = conn.cursor()
-
-        where_clauses = []
-        params = []
-
+        db = get_db()
+        
+        # Build filter query
+        filter_query = {}
+        
         if risk:
-            where_clauses.append('p.risk_category = ?')
-            params.append(risk)
-
-        if username:
-            where_clauses.append('u.username LIKE ?')
-            params.append(f"%{username}%")
-
-        if start_date:
-            where_clauses.append('p.created_at >= ?')
-            params.append(start_date)
-
-        if end_date:
-            where_clauses.append('p.created_at <= ?')
-            params.append(end_date)
-
-        where_sql = (' WHERE ' + ' AND '.join(where_clauses)) if where_clauses else ''
-
-        # Total count
-        count_sql = f"SELECT COUNT(*) FROM predictions p JOIN users u ON p.user_id = u.id {where_sql}"
-        c.execute(count_sql, tuple(params))
-        total = c.fetchone()[0]
-
-        # Pagination calculations
+            filter_query['risk_category'] = risk
+        
+        if start_date or end_date:
+            date_filter = {}
+            if start_date:
+                date_filter['$gte'] = start_date
+            if end_date:
+                date_filter['$lte'] = end_date
+            if date_filter:
+                filter_query['created_at'] = date_filter
+        
+        # Get total count
+        total = db[COLLECTION_ASSESSMENTS].count_documents(filter_query)
+        
+        # Parse pagination params
         try:
-            page = int(page)
-            per_page = int(per_page)
+            page = max(1, int(page))
+            per_page = max(1, int(per_page))
         except:
             page = 1
             per_page = 10
-        if page < 1: page = 1
-        if per_page < 1: per_page = 10
-
-        offset = (page - 1) * per_page
-
-        select_sql = f"""
-            SELECT p.id, p.user_id, u.username, p.age, p.anaemia,
-                   p.creatinine_phosphokinase, p.diabetes, p.ejection_fraction,
-                   p.high_blood_pressure, p.platelets, p.serum_creatinine,
-                   p.serum_sodium, p.sex, p.smoking, p.time, p.probability,
-                   p.risk_category, p.created_at
-            FROM predictions p
-            JOIN users u ON p.user_id = u.id
-            {where_sql}
-            ORDER BY p.created_at DESC
-            LIMIT ? OFFSET ?
-        """
-
-        exec_params = list(params) + [per_page, offset]
-        c.execute(select_sql, tuple(exec_params))
-        rows = c.fetchall()
-        conn.close()
-
+        
+        skip = (page - 1) * per_page
+        
+        # Query with pagination
+        assessments = db[COLLECTION_ASSESSMENTS].find(filter_query).sort(
+            'created_at', -1
+        ).skip(skip).limit(per_page)
+        
         results = []
-        for r in rows:
+        for assessment in assessments:
+            user_id = assessment['user_id']
+            user = db[COLLECTION_USERS].find_one({'_id': user_id})
+            uname = user['username'] if user else 'Unknown'
+            
+            # Apply username filter if specified
+            if username and username.lower() not in uname.lower():
+                continue
+            
             results.append({
-                'id': r[0],
-                'user_id': r[1],
-                'username': r[2],
+                'id': str(assessment['_id']),
+                'user_id': str(user_id),
+                'username': uname,
                 'features': {
-                    'age': r[3], 'anaemia': r[4], 'creatinine_phosphokinase': r[5],
-                    'diabetes': r[6], 'ejection_fraction': r[7], 'high_blood_pressure': r[8],
-                    'platelets': r[9], 'serum_creatinine': r[10], 'serum_sodium': r[11],
-                    'sex': r[12], 'smoking': r[13], 'time': r[14]
+                    'age': assessment.get('age'),
+                    'anaemia': assessment.get('anaemia'),
+                    'creatinine_phosphokinase': assessment.get('creatinine_phosphokinase'),
+                    'diabetes': assessment.get('diabetes'),
+                    'ejection_fraction': assessment.get('ejection_fraction'),
+                    'high_blood_pressure': assessment.get('high_blood_pressure'),
+                    'platelets': assessment.get('platelets'),
+                    'serum_creatinine': assessment.get('serum_creatinine'),
+                    'serum_sodium': assessment.get('serum_sodium'),
+                    'sex': assessment.get('sex'),
+                    'smoking': assessment.get('smoking'),
+                    'time': assessment.get('time')
                 },
-                'probability': r[15],
-                'risk_category': r[16],
-                'created_at': r[17]
+                'probability': assessment.get('probability'),
+                'risk_category': assessment.get('risk_category'),
+                'created_at': assessment.get('created_at')
             })
-
-        return {'predictions': results, 'total': total}
+        
+        return {'assessments': results, 'total': total}
+        
     except Exception as e:
-        print(f"Error fetching paginated predictions: {e}")
-        return {'predictions': [], 'total': 0}
+        print(f"Error fetching paginated assessments: {e}")
+        return {'assessments': [], 'total': 0}
 
-
-def get_predictions_filtered(risk=None, username=None, start_date=None, end_date=None):
-    """Return all predictions matching optional filters (no pagination)."""
+def get_assessments_filtered(risk=None, username=None, start_date=None, end_date=None):
+    """
+    Get all assessments matching optional filters (no pagination).
+    Used for CSV export.
+    
+    Returns:
+        list of assessment dicts
+    """
     try:
-        conn = sqlite3.connect(str(DB_PATH))
-        c = conn.cursor()
-
-        where_clauses = []
-        params = []
-
+        db = get_db()
+        
+        # Build filter query
+        filter_query = {}
+        
         if risk:
-            where_clauses.append('p.risk_category = ?')
-            params.append(risk)
-
-        if username:
-            where_clauses.append('u.username LIKE ?')
-            params.append(f"%{username}%")
-
-        if start_date:
-            where_clauses.append('p.created_at >= ?')
-            params.append(start_date)
-
-        if end_date:
-            where_clauses.append('p.created_at <= ?')
-            params.append(end_date)
-
-        where_sql = (' WHERE ' + ' AND '.join(where_clauses)) if where_clauses else ''
-
-        select_sql = f"""
-            SELECT p.id, p.user_id, u.username, p.age, p.anaemia,
-                   p.creatinine_phosphokinase, p.diabetes, p.ejection_fraction,
-                   p.high_blood_pressure, p.platelets, p.serum_creatinine,
-                   p.serum_sodium, p.sex, p.smoking, p.time, p.probability,
-                   p.risk_category, p.created_at
-            FROM predictions p
-            JOIN users u ON p.user_id = u.id
-            {where_sql}
-            ORDER BY p.created_at DESC
-        """
-
-        c.execute(select_sql, tuple(params))
-        rows = c.fetchall()
-        conn.close()
-
+            filter_query['risk_category'] = risk
+        
+        if start_date or end_date:
+            date_filter = {}
+            if start_date:
+                date_filter['$gte'] = start_date
+            if end_date:
+                date_filter['$lte'] = end_date
+            if date_filter:
+                filter_query['created_at'] = date_filter
+        
+        # Query and collect all matching assessments
+        assessments = db[COLLECTION_ASSESSMENTS].find(filter_query).sort('created_at', -1)
+        
         results = []
-        for r in rows:
+        for assessment in assessments:
+            user_id = assessment['user_id']
+            user = db[COLLECTION_USERS].find_one({'_id': user_id})
+            uname = user['username'] if user else 'Unknown'
+            
+            # Apply username filter if specified
+            if username and username.lower() not in uname.lower():
+                continue
+            
             results.append({
-                'id': r[0],
-                'user_id': r[1],
-                'username': r[2],
+                'id': str(assessment['_id']),
+                'user_id': str(user_id),
+                'username': uname,
                 'features': {
-                    'age': r[3], 'anaemia': r[4], 'creatinine_phosphokinase': r[5],
-                    'diabetes': r[6], 'ejection_fraction': r[7], 'high_blood_pressure': r[8],
-                    'platelets': r[9], 'serum_creatinine': r[10], 'serum_sodium': r[11],
-                    'sex': r[12], 'smoking': r[13], 'time': r[14]
+                    'age': assessment.get('age'),
+                    'anaemia': assessment.get('anaemia'),
+                    'creatinine_phosphokinase': assessment.get('creatinine_phosphokinase'),
+                    'diabetes': assessment.get('diabetes'),
+                    'ejection_fraction': assessment.get('ejection_fraction'),
+                    'high_blood_pressure': assessment.get('high_blood_pressure'),
+                    'platelets': assessment.get('platelets'),
+                    'serum_creatinine': assessment.get('serum_creatinine'),
+                    'serum_sodium': assessment.get('serum_sodium'),
+                    'sex': assessment.get('sex'),
+                    'smoking': assessment.get('smoking'),
+                    'time': assessment.get('time')
                 },
-                'probability': r[15],
-                'risk_category': r[16],
-                'created_at': r[17]
+                'probability': assessment.get('probability'),
+                'risk_category': assessment.get('risk_category'),
+                'created_at': assessment.get('created_at')
             })
-
+        
         return results
+        
     except Exception as e:
-        print(f"Error fetching filtered predictions: {e}")
+        print(f"Error fetching filtered assessments: {e}")
         return []
 
-def get_patient_with_predictions(patient_id):
-    """Get patient details and all their predictions"""
+def get_patient_profile(patient_id):
+    """
+    Get a patient's profile and all their assessments.
+    
+    Args:
+        patient_id: MongoDB ObjectId or string ID
+    
+    Returns:
+        dict with patient info and assessment list, or None
+    """
     try:
-        conn = sqlite3.connect(str(DB_PATH))
-        c = conn.cursor()
+        db = get_db()
         
-        # Get patient info
-        c.execute('SELECT id, username, email, created_at FROM users WHERE id = ? AND role = ?',
-                  (patient_id, 'patient'))
-        patient = c.fetchone()
+        # Convert string ID to ObjectId if needed
+        if isinstance(patient_id, str):
+            patient_id = ObjectId(patient_id)
+        
+        # Get patient user info
+        patient = db[COLLECTION_USERS].find_one({'_id': patient_id, 'role': 'patient'})
         
         if not patient:
             return None
         
-        # Get all predictions for this patient (include full feature set)
-        c.execute('''SELECT id, age, anaemia, creatinine_phosphokinase, diabetes,
-                            ejection_fraction, high_blood_pressure, platelets,
-                            serum_creatinine, serum_sodium, sex, smoking, time,
-                            probability, risk_category, created_at
-                     FROM predictions
-                     WHERE user_id = ? ORDER BY created_at DESC''', (patient_id,))
-        predictions = c.fetchall()
-        conn.close()
-
-        preds = []
-        for p in predictions:
-            preds.append({
-                'id': p[0],
-                'age': p[1],
-                'anaemia': p[2],
-                'creatinine_phosphokinase': p[3],
-                'diabetes': p[4],
-                'ejection_fraction': p[5],
-                'high_blood_pressure': p[6],
-                'platelets': p[7],
-                'serum_creatinine': p[8],
-                'serum_sodium': p[9],
-                'sex': p[10],
-                'smoking': p[11],
-                'time': p[12],
-                'probability': p[13],
-                'risk_category': p[14],
-                'created_at': p[15]
+        # Get all assessments for this patient
+        assessments_cursor = db[COLLECTION_ASSESSMENTS].find(
+            {'user_id': patient_id}
+        ).sort('created_at', -1)
+        
+        assessments = []
+        for a in assessments_cursor:
+            assessments.append({
+                'id': str(a['_id']),
+                'age': a.get('age'),
+                'anaemia': a.get('anaemia'),
+                'creatinine_phosphokinase': a.get('creatinine_phosphokinase'),
+                'diabetes': a.get('diabetes'),
+                'ejection_fraction': a.get('ejection_fraction'),
+                'high_blood_pressure': a.get('high_blood_pressure'),
+                'platelets': a.get('platelets'),
+                'serum_creatinine': a.get('serum_creatinine'),
+                'serum_sodium': a.get('serum_sodium'),
+                'sex': a.get('sex'),
+                'smoking': a.get('smoking'),
+                'time': a.get('time'),
+                'probability': a.get('probability'),
+                'risk_category': a.get('risk_category'),
+                'created_at': a.get('created_at')
             })
-
+        
         return {
-            'id': patient[0],
-            'username': patient[1],
-            'email': patient[2],
-            'registered': patient[3],
-            'predictions': preds
+            'id': str(patient['_id']),
+            'username': patient['username'],
+            'email': patient.get('email'),
+            'registered': patient.get('created_at'),
+            'predictions': assessments
         }
+        
     except Exception as e:
-        print(f"Error fetching patient details: {e}")
+        print(f"Error fetching patient profile: {e}")
         return None
 
-
 def update_user_profile(user_id, new_username=None, new_email=None, new_password=None):
-    """Update user profile fields safely. Returns (success, message)."""
+    """
+    Update user profile information in MongoDB.
+    
+    Args:
+        user_id: MongoDB ObjectId or string ID
+        new_username: New username (optional)
+        new_email: New email (optional)
+        new_password: New password to hash (optional)
+    
+    Returns:
+        (success: bool, message: str)
+    """
     try:
-        conn = sqlite3.connect(str(DB_PATH))
-        c = conn.cursor()
-
+        db = get_db()
+        
+        # Convert string ID to ObjectId if needed
+        if isinstance(user_id, str):
+            user_id = ObjectId(user_id)
+        
         # Check username uniqueness if changing
         if new_username:
-            c.execute('SELECT id FROM users WHERE username = ? AND id != ?', (new_username, user_id))
-            if c.fetchone():
-                conn.close()
+            existing = db[COLLECTION_USERS].find_one({
+                'username': new_username,
+                '_id': {'$ne': user_id}
+            })
+            if existing:
                 return False, 'Username already taken'
-
-        # Build update parts
-        updates = []
-        params = []
+        
+        # Check email uniqueness if changing
+        if new_email:
+            existing = db[COLLECTION_USERS].find_one({
+                'email': new_email,
+                '_id': {'$ne': user_id}
+            })
+            if existing:
+                return False, 'Email already taken'
+        
+        # Build update dict
+        update_doc = {'updated_at': datetime.utcnow()}
+        
         if new_username:
-            updates.append('username = ?')
-            params.append(new_username)
+            if len(new_username) < 3:
+                return False, 'Username must be at least 3 characters'
+            update_doc['username'] = new_username
+        
         if new_email is not None:
-            updates.append('email = ?')
-            params.append(new_email)
+            update_doc['email'] = new_email
+        
         if new_password:
-            # Hash password
-            pwd_hash = generate_password_hash(new_password)
-            updates.append('password_hash = ?')
-            params.append(pwd_hash)
-
-        if not updates:
-            conn.close()
+            if len(new_password) < 6:
+                return False, 'Password must be at least 6 characters'
+            update_doc['password_hash'] = generate_password_hash(new_password)
+        
+        if len(update_doc) == 1:  # Only updated_at
             return True, 'No changes'
-
-        params.append(user_id)
-        sql = f"UPDATE users SET {', '.join(updates)} WHERE id = ?"
-        c.execute(sql, tuple(params))
-        conn.commit()
-        conn.close()
-        return True, 'Profile updated'
+        
+        # Update user document
+        result = db[COLLECTION_USERS].update_one(
+            {'_id': user_id},
+            {'$set': update_doc}
+        )
+        
+        if result.matched_count == 0:
+            return False, 'User not found'
+        
+        return True, 'Profile updated successfully'
+        
     except Exception as e:
         print(f"Error updating profile: {e}")
         return False, str(e)
 
 # ===== DECORATORS =====
+
 def login_required(f):
-    """Decorator to require login"""
+    """Decorator to require user login."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
@@ -518,7 +844,7 @@ def login_required(f):
     return decorated_function
 
 def patient_required(f):
-    """Decorator to require patient role"""
+    """Decorator to require patient role."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session or session.get('role') != 'patient':
@@ -527,18 +853,23 @@ def patient_required(f):
     return decorated_function
 
 def doctor_required(f):
-    """Decorator to require doctor role"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session or session.get('role') != 'doctor':
+        print("DEBUG ROLE:", session.get('role'))
+
+        role = str(session.get('role', '')).strip().lower()
+        if 'user_id' not in session or role != 'doctor':
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
+
 # ===== MODEL LOADING =====
+
 print("Loading CAD Prediction Model...")
 model = None
 scaler = None
+
 try:
     with MODEL_PATH.open("rb") as f:
         model = pickle.load(f)
@@ -548,8 +879,7 @@ try:
 except FileNotFoundError:
     print("⚠ Model not found! Please run ml_model.py first.")
 
-# Load feature names
-DATA_PATH = BASE_DIR.parent / "dataset" / "heart.csv"
+# Load feature names from dataset
 try:
     df_header = pd.read_csv(DATA_PATH, nrows=0)
     target_col = "DEATH_EVENT" if "DEATH_EVENT" in df_header.columns else df_header.columns[-1]
@@ -557,9 +887,9 @@ try:
     print(f"✓ Features loaded: {len(FEATURE_NAMES)} parameters")
 except:
     FEATURE_NAMES = []
-    print("⚠ Could not load features")
+    print("⚠ Could not load features from dataset")
 
-# Load feature importance
+# Load feature importance if available
 FEATURE_IMPORTANCE = None
 try:
     FEATURE_IMPORTANCE = pd.read_csv(BASE_DIR / "feature_importance.csv")
@@ -567,8 +897,17 @@ except:
     pass
 
 # ===== UTILITY FUNCTIONS =====
+
 def get_risk_category(probability):
-    """Categorize risk level"""
+    """
+    Categorize CAD risk level based on prediction probability.
+    
+    Args:
+        probability: float between 0 and 1
+    
+    Returns:
+        (category: str, color: str) - category is LOW/MEDIUM/HIGH
+    """
     if probability < 0.33:
         return "LOW", "#27ae60"  # Green
     elif probability < 0.67:
@@ -577,7 +916,15 @@ def get_risk_category(probability):
         return "HIGH", "#e74c3c"  # Red
 
 def get_recommendation(risk_category):
-    """Get medical recommendation"""
+    """
+    Get medical recommendation based on risk category.
+    
+    Args:
+        risk_category: 'LOW', 'MEDIUM', 'HIGH', or 'ERROR'
+    
+    Returns:
+        str with recommendation text
+    """
     recommendations = {
         'LOW': 'Continue regular health check-ups. Maintain healthy lifestyle.',
         'MEDIUM': 'Schedule appointment with cardiologist for further evaluation.',
@@ -590,7 +937,7 @@ def get_recommendation(risk_category):
 
 @app.route("/")
 def index():
-    """Home page - redirect based on role"""
+    """Home page - redirect based on user role."""
     if 'user_id' not in session:
         return redirect(url_for('login'))
     
@@ -601,7 +948,7 @@ def index():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    """Login route for both patients and doctors"""
+    """Login route for both patients and doctors."""
     if request.method == "POST":
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
@@ -612,16 +959,23 @@ def login():
         success, user_info = login_user(username, password)
         
         if success:
+            # Normalize role - remove whitespace and convert to lowercase
+            normalized_role = user_info['role'].lower().strip() if user_info['role'] else ''
+            
+            # Start persistent session
             session.permanent = True
-            session['user_id'] = user_info['user_id']
-            session['role'] = user_info['role']
+            session['user_id'] = str(user_info['user_id'])  # Store as string
+            session['role'] = normalized_role  # Store normalized role
             session['username'] = user_info['username']
             
-            # Redirect based on role
-            if user_info['role'] == 'doctor':
+            # Redirect based on normalized role
+            if normalized_role == 'doctor':
                 return redirect(url_for('doctor_dashboard'))
-            else:
+            elif normalized_role == 'patient':
                 return redirect(url_for('patient_dashboard'))
+            else:
+                # Fallback for unexpected role values
+                return render_template("login.html", error="Invalid user role in system")
         else:
             return render_template("login.html", error="Invalid username or password")
     
@@ -629,12 +983,12 @@ def login():
 
 @app.route("/register", methods=["GET"])
 def register():
-    """Redirect to role selection"""
+    """Role selection page."""
     return render_template("register.html")
 
 @app.route("/register_patient", methods=["GET", "POST"])
 def register_patient():
-    """Patient registration"""
+    """Patient registration route."""
     if request.method == "POST":
         username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip()
@@ -655,7 +1009,7 @@ def register_patient():
 
 @app.route("/register_doctor", methods=["GET", "POST"])
 def register_doctor():
-    """Doctor registration"""
+    """Doctor registration route."""
     if request.method == "POST":
         username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip()
@@ -676,23 +1030,23 @@ def register_doctor():
 
 @app.route("/logout")
 def logout():
-    """Logout"""
+    """Logout route - clears session."""
     session.clear()
     return redirect(url_for('login'))
 
 @app.route("/patient/dashboard")
 @patient_required
 def patient_dashboard():
-    """Patient dashboard - shows their predictions"""
-    predictions = get_patient_predictions(session['user_id'])
+    """Patient dashboard - shows their CAD assessments."""
+    assessments = get_patient_assessments(session['user_id'])
     return render_template("patient_dashboard.html", 
                          username=session['username'],
-                         predictions=predictions)
+                         predictions=assessments)
 
 @app.route("/patient/predict", methods=["GET", "POST"])
 @patient_required
 def patient_predict():
-    """Patient prediction form"""
+    """Patient prediction form and processing."""
     if request.method == "POST":
         if model is None or scaler is None:
             return render_template("predict.html", 
@@ -700,7 +1054,7 @@ def patient_predict():
                                  username=session['username'])
         
         try:
-            # Collect features
+            # Collect medical features from form
             features_input = {}
             data = []
             for name in FEATURE_NAMES:
@@ -712,14 +1066,15 @@ def patient_predict():
                 features_input[name] = float(val)
                 data.append(float(val))
             
-            # Make prediction
+            # Make prediction using ML model
             data_scaled = scaler.transform([data])
             probability = float(model.predict_proba(data_scaled)[0][1])
             risk_category, risk_color = get_risk_category(probability)
             
-            # Save to database
-            save_prediction(session['user_id'], features_input, probability, risk_category)
+            # Save assessment to MongoDB
+            save_assessment(session['user_id'], features_input, probability, risk_category)
             
+            # Prepare result for display
             result = {
                 'probability': round(probability * 100, 2),
                 'risk_category': risk_category,
@@ -740,24 +1095,24 @@ def patient_predict():
 @app.route("/doctor/dashboard")
 @doctor_required
 def doctor_dashboard():
-    """Doctor dashboard - shows all patients and their predictions"""
+    """Doctor dashboard - shows all patients and their assessment counts."""
     patients = get_all_patients()
     return render_template("doctor_dashboard.html",
                          username=session['username'],
                          patients=patients)
 
-@app.route("/doctor/patient/<int:patient_id>")
+@app.route("/doctor/patient/<patient_id>")
 @doctor_required
 def doctor_patient_details(patient_id):
-    """Doctor view - patient details and predictions"""
-    patient = get_patient_with_predictions(patient_id)
+    """Doctor view - patient details and all their assessments."""
+    patient = get_patient_profile(patient_id)
     
     if not patient:
         return render_template("doctor_dashboard.html",
                              username=session['username'],
                              error="Patient not found")
     
-    # Provide template-compatible variables
+    # Render patient details template with template-compatible variables
     return render_template("patient_details.html",
                          username=session['username'],
                          patient_name=patient.get('username'),
@@ -768,178 +1123,223 @@ def doctor_patient_details(patient_id):
 
 @app.route("/about")
 def about():
-    """About page"""
+    """About page."""
     return render_template("about.html")
-
 
 @app.route('/profile', methods=['GET'])
 @login_required
 def profile():
-    """Return profile page or JSON with current user details.
-
-    - If `?json=1` query param is present, return JSON payload with user info.
-    - Otherwise render the editable profile page.
+    """
+    Profile page for logged-in user.
+    Returns profile editing form or JSON user data.
     """
     user_id = session.get('user_id')
-    # Fetch user info
+    
     try:
-        conn = sqlite3.connect(str(DB_PATH))
-        c = conn.cursor()
-        c.execute('SELECT id, username, email, role, created_at FROM users WHERE id = ?', (user_id,))
-        u = c.fetchone()
-        conn.close()
-        if not u:
+        user = get_user_info(user_id)
+        
+        if not user:
             return redirect(url_for('logout'))
-
-        user_data = {
-            'id': u[0],
-            'username': u[1],
-            'email': u[2],
-            'role': u[3],
-            'created_at': u[4]
-        }
-
+        
+        # Return JSON if requested
         if request.args.get('json') == '1':
-            return jsonify({'user': user_data})
-
+            return jsonify({'user': user})
+        
         # Render profile editing page
         return render_template('profile.html', username=session.get('username'))
+        
     except Exception as e:
         print(f"Error loading profile: {e}")
         return redirect(url_for('login'))
 
-
 @app.route('/profile/update', methods=['POST'])
 @login_required
 def profile_update():
-    """Handle profile updates from logged-in user.
-
-    Expects JSON body: { username, email, password, confirm_password }
+    """
+    Update logged-in user's profile information.
+    Expects JSON: { username, email, password, confirm_password }
     Returns JSON: { success: bool, message: str }
     """
     user_id = session.get('user_id')
-    data = None
+    
     try:
+        # Parse request data
         if request.is_json:
             data = request.get_json()
         else:
-            # form-encoded fallback
             data = request.form.to_dict()
     except Exception:
         return jsonify({'success': False, 'message': 'Invalid request payload'}), 400
-
-    new_username = data.get('username', '').strip() if data.get('username') is not None else None
+    
+    # Extract and validate fields
+    new_username = data.get('username', '').strip() if data.get('username') else None
     new_email = data.get('email') if 'email' in data else None
-    new_password = data.get('password', '')
-    confirm_password = data.get('confirm_password', '')
-
-    # Validate
+    new_password = data.get('password', '').strip()
+    confirm_password = data.get('confirm_password', '').strip()
+    
+    # Validate password if provided
     if new_password:
         if len(new_password) < 6:
             return jsonify({'success': False, 'message': 'Password must be at least 6 characters'}), 400
         if new_password != confirm_password:
             return jsonify({'success': False, 'message': 'Passwords do not match'}), 400
-
+    
+    # Validate username if provided
     if new_username:
         if len(new_username) < 3:
             return jsonify({'success': False, 'message': 'Username must be at least 3 characters'}), 400
-
-    # Attempt update
-    success, msg = update_user_profile(user_id, new_username=new_username or None,
-                                       new_email=new_email, new_password=new_password or None)
-
+    
+    # Update profile in MongoDB
+    success, message = update_user_profile(
+        user_id,
+        new_username=new_username if new_username else None,
+        new_email=new_email,
+        new_password=new_password if new_password else None
+    )
+    
     if success:
-        # If username changed, update session username
+        # Update session username if changed
         if new_username:
             session['username'] = new_username
-        return jsonify({'success': True, 'message': msg})
+        return jsonify({'success': True, 'message': message})
     else:
-        return jsonify({'success': False, 'message': msg}), 400
+        return jsonify({'success': False, 'message': message}), 400
 
-
-@app.route("/doctor/predictions")
+@app.route("/doctor/assessments")
 @doctor_required
-def doctor_predictions():
-    """Doctor-only API endpoint returning all patient assessments as JSON.
-
-    Returns a list of objects with: username, features, probability, risk_category, created_at
+def doctor_assessments():
     """
-    # Support server-side pagination and basic filters (risk, username, date range)
+    Doctor API endpoint returning all patient assessments as JSON.
+    Supports pagination and filtering by risk, username, or date range.
+    """
     page = request.args.get('page', 1)
     per_page = request.args.get('per_page', 10)
     risk = request.args.get('risk')
     username = request.args.get('username')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-
-    data = get_predictions_paginated(page=page, per_page=per_page, risk=risk,
-                                     username=username, start_date=start_date, end_date=end_date)
-
-    preds = data.get('predictions', [])
+    
+    data = get_assessments_paginated(
+        page=page,
+        per_page=per_page,
+        risk=risk,
+        username=username,
+        start_date=start_date,
+        end_date=end_date
+    )
+    
+    assessments = data.get('assessments', [])
     total = data.get('total', 0)
+    
     try:
         page = int(page)
         per_page = int(per_page)
     except:
         page = 1
         per_page = 10
-
+    
     total_pages = max(1, (total + per_page - 1) // per_page)
+    
+    return jsonify({
+        'assessments': assessments,
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': total_pages
+    })
 
-    return jsonify({'predictions': preds, 'total': total, 'page': page, 'per_page': per_page, 'total_pages': total_pages})
-
-
-@app.route('/doctor/predictions.csv')
+@app.route('/doctor/assessments.csv')
 @doctor_required
-def doctor_predictions_csv():
-    """Return all predictions as a CSV file for doctors (streamed).
-
-    Columns: id, user_id, username, created_at, probability, risk_category, <features...>
+def doctor_assessments_csv():
     """
-    # Allow CSV export to accept same filters as the JSON endpoint
+    Export all assessments as CSV file for doctors.
+    Supports filtering by risk, username, or date range.
+    """
     risk = request.args.get('risk')
     username = request.args.get('username')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-
-    preds = get_predictions_filtered(risk=risk, username=username, start_date=start_date, end_date=end_date)
-
+    
+    assessments = get_assessments_filtered(
+        risk=risk,
+        username=username,
+        start_date=start_date,
+        end_date=end_date
+    )
+    
     # Create CSV in memory
     output = io.StringIO()
     writer = csv.writer(output)
-
-    # Header
+    
+    # Write header
     headers = [
-        'id','user_id','username','created_at','probability','risk_category',
-        'age','anaemia','creatinine_phosphokinase','diabetes','ejection_fraction',
-        'high_blood_pressure','platelets','serum_creatinine','serum_sodium','sex','smoking','time'
+        'id', 'user_id', 'username', 'created_at', 'probability', 'risk_category',
+        'age', 'anaemia', 'creatinine_phosphokinase', 'diabetes', 'ejection_fraction',
+        'high_blood_pressure', 'platelets', 'serum_creatinine', 'serum_sodium',
+        'sex', 'smoking', 'time'
     ]
     writer.writerow(headers)
-
-    for p in preds:
-        f = p.get('features', {})
+    
+    # Write assessment rows
+    for a in assessments:
+        f = a.get('features', {})
         row = [
-            p.get('id'), p.get('user_id'), p.get('username'), p.get('created_at'),
-            p.get('probability'), p.get('risk_category'),
-            f.get('age'), f.get('anaemia'), f.get('creatinine_phosphokinase'), f.get('diabetes'),
-            f.get('ejection_fraction'), f.get('high_blood_pressure'), f.get('platelets'),
-            f.get('serum_creatinine'), f.get('serum_sodium'), f.get('sex'), f.get('smoking'), f.get('time')
+            a.get('id'),
+            a.get('user_id'),
+            a.get('username'),
+            a.get('created_at'),
+            a.get('probability'),
+            a.get('risk_category'),
+            f.get('age'),
+            f.get('anaemia'),
+            f.get('creatinine_phosphokinase'),
+            f.get('diabetes'),
+            f.get('ejection_fraction'),
+            f.get('high_blood_pressure'),
+            f.get('platelets'),
+            f.get('serum_creatinine'),
+            f.get('serum_sodium'),
+            f.get('sex'),
+            f.get('smoking'),
+            f.get('time')
         ]
         writer.writerow(row)
-
+    
     csv_data = output.getvalue()
     output.close()
+    
+    return Response(
+        csv_data,
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=patient_assessments.csv'}
+    )
 
-    # Return CSV response with filename
-    return Response(csv_data, mimetype='text/csv', headers={
-        'Content-Disposition': 'attachment; filename=patient_assessments.csv'
-    })
+# ===== ERROR HANDLERS =====
+
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 errors."""
+    return render_template("login.html", error="Page not found"), 404
+
+@app.errorhandler(500)
+def server_error(error):
+    """Handle 500 errors."""
+    print(f"Server error: {error}")
+    return render_template("login.html", error="Server error. Please try again."), 500
+
+# ===== MAIN APP STARTUP =====
 
 if __name__ == "__main__":
-    init_db()
     print("\n" + "=" * 80)
-    print("CAD Prediction System - Multi-Role Edition")
+    print("CAD Prediction System - MongoDB Atlas Edition")
     print("=" * 80)
-    print(f"Running on: http://127.0.0.1:5000")
-    print("=" * 80 + "\n")
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    
+    # Initialize MongoDB connection
+    if init_mongodb():
+        print(f"Running on: http://127.0.0.1:5000")
+        print("=" * 80 + "\n")
+        app.run(debug=True, host='127.0.0.1', port=5000)
+    else:
+        print("✗ Failed to start: MongoDB connection failed")
+        print("Please check your MONGODB_URL configuration")
+        print("=" * 80 + "\n")

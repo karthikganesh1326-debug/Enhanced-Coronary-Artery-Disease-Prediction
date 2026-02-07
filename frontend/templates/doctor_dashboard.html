@@ -82,7 +82,7 @@
                     <button id="applyFilters" class="btn">Filter</button>
                     <button id="clearFilters" class="btn btn-secondary">Clear</button>
                 </div>
-                <a id="exportCsvLink" href="/doctor/predictions.csv" class="btn btn-secondary" title="Export all assessments as CSV">Export CSV</a>
+                    <a id="exportCsvLink" href="/doctor/assessments.csv" class="btn btn-secondary" title="Export all assessments as CSV">Export CSV</a>
                 <div id="paginationControls" style="display:flex;gap:8px;align-items:center;"></div>
             </div>
         </div>
@@ -414,11 +414,14 @@ document.addEventListener('DOMContentLoaded', function(){
         const query = buildQuery(page);
         // update export link to include current filters
         const exportLink = document.getElementById('exportCsvLink');
-        exportLink.href = '/doctor/predictions.csv' + (query ? ('?' + query) : '');
+        exportLink.href = '/doctor/assessments.csv' + (query ? ('?' + query) : '');
 
-        fetch(`/doctor/predictions?${query}`)
+        fetch(`/doctor/assessments?${query}`)
             .then(res => {
-                if (!res.ok) throw new Error('Not authorized or network error');
+                if (!res.ok) {
+                    // Do not redirect to /login on fetch failures; show an inline error instead
+                    throw new Error('Network response was not ok: ' + res.status);
+                }
                 return res.json();
             })
             .then(data => {
@@ -428,8 +431,15 @@ document.addEventListener('DOMContentLoaded', function(){
                 renderPage();
             })
             .catch(err => {
-                console.error(err);
-                window.location.href = '/login';
+                console.error('Failed to fetch assessments:', err);
+                // Show a friendly, non-redirecting error message in the table
+                tableBody.innerHTML = '<tr><td colspan="4">Error loading assessments. Please try again later.</td></tr>';
+                // Disable export while in error state
+                if (exportLink) exportLink.href = '#';
+                // Update pagination controls to reflect zero/unknown state
+                total = 0;
+                pagePreds = [];
+                renderPaginationControls();
             });
     }
 
